@@ -4,7 +4,7 @@ import random
 pygame.init()
 
 
-width, height = 400, 700
+width, height = 300, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Shared lanes vehicle simulation')
 
@@ -78,12 +78,12 @@ class Vehicle:
             pygame.draw.rect(surface, WHITE, (self.x, int(self.y), self.width, self.length))
 
 
-motorcycle_positions = [120, 260]
-car_positions = [60, 330]
+motorcycle_positions = [120, 180]
+car_positions = [45, 240]
 
 
 vehicle_types = ["motorcycle", "car"]
-probabilities = [0.6, 0.4]  # 60% for motorcycles, 40% for cars
+probabilities = [0.7, 0.3]  # 60% for motorcycles, 40% for cars
 
 # Create a dictionary to store vehicles for each lane
 vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
@@ -122,8 +122,12 @@ while running:
 
     screen.fill(BLUE)
 
+# Draw dotted lines at x=90 and x=205
+    for y in range(0, height, 20):  # Adjust the step to control the gap size
+        pygame.draw.line(screen, WHITE, (90, y), (90, y + 10), 2)  
+        pygame.draw.line(screen, WHITE, (205, y), (205, y + 10), 2)  
    
-    pygame.draw.line(screen, WHITE, (200, 0), (200, height), 5)
+   
 
     # Update and draw vehicles
     for lane, lane_vehicles in vehicles.items():
