@@ -83,7 +83,7 @@ car_positions = [45, 240]
 
 
 vehicle_types = ["motorcycle", "car"]
-probabilities = [0.7, 0.3]  # 60% for motorcycles, 40% for cars
+probabilities = [0.7, 0.3]  # 65% for motorcycles, 35% for cars
 
 # Create a dictionary to store vehicles for each lane
 vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
