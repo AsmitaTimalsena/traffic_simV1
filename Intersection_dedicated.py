@@ -1,160 +1,284 @@
-import pygame 
-import math
+
+import pygame
+import random
+import sys
+
 
 pygame.init()
 
+
 # Screen dimensions
-width, height = 1280, 800
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption('Traffic Intersection Layout with 4-Lane Roads')
+screen_width = 1280
+screen_height = 800
+screen = pygame.display.set_mode((screen_width, screen_height))
+pygame.display.set_caption("North Road Vehicle Simulation")
+
 
 # Colors
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GRAY = (50, 50, 50)
 BLUE = (0, 0, 100)
+YELLOW = (255, 255, 0)
 
-# Lane properties
-lane_width = 60
-separator_thickness = 8
-intersection_width = lane_width * 8
-intersection_height = lane_width * 4
 
-# Offset to shift the intersection downward
-intersection_offset = 150
+# Load and scale the background image
+background_image = pygame.image.load("dedicated_laneIMG.png")
+background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 
-# Calculate the exact width for 4-lane roads
-four_lane_width = lane_width * 4
 
-# Added padding for south road (30 units on each side)
-south_road_padding = 30
+# Global variables
+total_vehicles_passed = 0
+motorcycle_positions = [760, 795]  # Middle lanes for motorcycles
+car_positions = [680, 850]        # Outer lanes for cars
+motorcycle_safe_threshold = 50  # Safe distance for motorcycles
+car_safe_threshold = 180  # Increased safe distance for cars
 
-# Adjustment for alignment
-overlap_correction = separator_thickness // 2
 
-# Dashed line properties
-dash_length = 20
-gap_length = 20
+# Vehicle class
+class Vehicle:
+    def __init__(self, vehicle_type, lane_position):
+        self.vehicle_type = vehicle_type
+        self.x = lane_position
+        self.y = random.randint(-screen_height, 0)  # Start off-screen
+        self.max_speed = 4 if vehicle_type == "motorcycle" else 3
+        self.speed = random.uniform(2.5, 4.0) if vehicle_type == "motorcycle" else random.uniform(1.5, 3.0)
+        self.original_speed = self.speed
+        self.is_turning = False  # Tracks if the vehicle is turning
+        self.angle = 0  # Initial angle (facing south)
 
-def draw_dashed_line(surface, color, start_pos, end_pos, width=2):
-    x1, y1 = start_pos
-    x2, y2 = end_pos
-    
-    length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-    angle = math.atan2(y2 - y1, x2 - x1)
-    
-    dx = (dash_length + gap_length) * math.cos(angle)
-    dy = (dash_length + gap_length) * math.sin(angle)
-    
-    x, y = x1, y1
-    segment_length = dash_length + gap_length
-    num_segments = int(length / segment_length)
-    
-    for i in range(num_segments):
-        dash_start = (x, y)
-        dash_end = (x + dash_length * math.cos(angle),
-                   y + dash_length * math.sin(angle))
-        pygame.draw.line(surface, color, dash_start, dash_end, width)
-        x += dx
-        y += dy
 
-try:
-    running = True
-    clock = pygame.time.Clock()
+        # Vehicle size
+        if vehicle_type == "motorcycle":
+            self.width = random.randint(8, 12)  # Narrower width for a sleek look
+            self.height = random.randint(22, 28)  # Taller height for elongation
+        elif vehicle_type == "car":
+            self.width = random.randint(20, 30)  # Width for cars
+            self.height = random.randint(40, 50)  # Length for cars
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
 
-        screen.fill(BLUE)
+# Inside the Vehicle class, modify the `move` method
+    def move(self, vehicles_in_lane, safe_threshold):
+        global total_vehicles_passed
 
-        # Calculate road center and intersection coordinates
-        road_center_y = height // 2 + intersection_offset
-        intersection_top = road_center_y - intersection_height // 2
-        intersection_bottom = road_center_y + intersection_height // 2
-        intersection_left = width // 2 - intersection_width // 2
-        intersection_right = intersection_left + intersection_width
+        # Coordinates of the turning points
+        car_turning_x, car_turning_y = 845, 470
+        bike_turning_x, bike_turning_y = 800, 530
 
-        # Calculate the starting x-coordinate for the south road with padding
-        south_road_x = width // 2 - (four_lane_width // 2) - south_road_padding
+        # Special logic for cars at x=850 (approaching the turning point)
+        if self.vehicle_type == "car" and not self.is_turning:
+            # Check distance to the turning point
+            distance_to_turn = abs(self.y - car_turning_y)
 
-        # Draw extended lanes
-        # North lanes
-        pygame.draw.rect(screen, GRAY, (width // 2 - 4 * lane_width, 0, lane_width * 8, intersection_top + overlap_correction))
+            # Identify the leading vehicle (most forward vehicle in the lane)
+            leading_vehicle = None
+            for other_vehicle in vehicles_in_lane:
+                if other_vehicle != self and other_vehicle.y > self.y:
+                    if not leading_vehicle or other_vehicle.y < leading_vehicle.y:
+                        leading_vehicle = other_vehicle
 
-        # South lanes
-        pygame.draw.rect(screen, GRAY, (south_road_x, intersection_bottom - overlap_correction, four_lane_width + (south_road_padding * 2), height - intersection_bottom))
+            # Slow down trailing vehicles if the leading vehicle is near the turning point
+            if distance_to_turn < 50:  # If this vehicle is close to the turning point
+                for other_vehicle in vehicles_in_lane:
+                    if other_vehicle != self and other_vehicle.y < self.y:  # Trailing vehicle
+                        distance_behind = self.y - other_vehicle.y
+                        if distance_behind < safe_threshold:  # Too close
+                            other_vehicle.speed = max(self.speed - 1, 0.5)  # Reduce trailing vehicle speed
 
-        # West lanes
-        pygame.draw.rect(screen, GRAY, (0, road_center_y - 2 * lane_width, intersection_left + overlap_correction, four_lane_width))
+            # Start turning once at the turning point
+            if self.x == 850 and self.y >= car_turning_y:
+                self.is_turning = True
+                self.y = car_turning_y  # Snap to the turning point
+                self.x = car_turning_x  # Adjust position slightly for realism
+                self.angle = 90  # Rotate the vehicle to face east
 
-        # East lanes
-        pygame.draw.rect(screen, GRAY, (intersection_right - overlap_correction, road_center_y - 2 * lane_width, width - intersection_right + overlap_correction, four_lane_width))
+        # Add similar logic for motorcycles at x=795
+        if self.vehicle_type == "motorcycle" and not self.is_turning:
+            # Check distance to the turning point
+            distance_to_turn = abs(self.y - bike_turning_y)
 
-        # Draw intersection
-        pygame.draw.rect(screen, GRAY, (intersection_left - overlap_correction, intersection_top - overlap_correction, intersection_width + separator_thickness, intersection_height + separator_thickness))
+            # Identify the leading vehicle (most forward vehicle in the lane)
+            leading_vehicle = None
+            for other_vehicle in vehicles_in_lane:
+                if other_vehicle != self and other_vehicle.y > self.y:
+                    if not leading_vehicle or other_vehicle.y < leading_vehicle.y:
+                        leading_vehicle = other_vehicle
 
-        # Calculate consistent positions for all separators
-        north_south_center = width // 2
-        east_west_center = road_center_y
+            # Slow down trailing vehicles if the leading vehicle is near the turning point
+            if distance_to_turn < 50:  # If this vehicle is close to the turning point
+                for other_vehicle in vehicles_in_lane:
+                    if other_vehicle != self and other_vehicle.y < self.y:  # Trailing vehicle
+                        distance_behind = self.y - other_vehicle.y
+                        if distance_behind < safe_threshold:  # Too close
+                            other_vehicle.speed = max(self.speed - 1, 0.5)  # Reduce trailing vehicle speed
 
-        # Draw solid middle separators
-        # North road middle separator
-        pygame.draw.line(screen, WHITE, (north_south_center, 0), (north_south_center, intersection_top), separator_thickness)
-        
-        # South road middle separator
-        pygame.draw.line(screen, WHITE, (north_south_center, intersection_bottom), (north_south_center, height), separator_thickness)
-        
-        # West road middle separator
-        pygame.draw.line(screen, WHITE, (0, east_west_center), (intersection_left, east_west_center), separator_thickness)
-        
-        # East road middle separator
-        pygame.draw.line(screen, WHITE, (intersection_right, east_west_center), (width, east_west_center), separator_thickness)
+            # Start turning once at the turning point
+            if self.x == 795 and self.y >= bike_turning_y:
+                self.is_turning = True
+                self.y = bike_turning_y  # Snap to the turning point
+                self.x = bike_turning_x  # Adjust position slightly for realism
+                self.angle = 90  # Rotate the vehicle to face east
 
-        # Draw dashed lane separators with consistent positioning
-        # South road dashed separators (shifted slightly inward)
-        offset_adjustment = 10  # Amount to shift the dashed lines inward
-        left_south_dash = north_south_center - (lane_width + lane_width // 2 - offset_adjustment)
-        right_south_dash = north_south_center + (lane_width + lane_width // 2 - offset_adjustment)
-        draw_dashed_line(screen, WHITE, (left_south_dash, intersection_bottom), (left_south_dash, height))
-        draw_dashed_line(screen, WHITE, (right_south_dash, intersection_bottom), (right_south_dash, height))
+        if self.is_turning:
+            # Maintain speed during the turn
+            self.speed = self.original_speed
 
-        # West road dashed separators
-        upper_west_dash = east_west_center - lane_width
-        lower_west_dash = east_west_center + lane_width
-        draw_dashed_line(screen, WHITE, (0, upper_west_dash), (intersection_left, upper_west_dash))
-        draw_dashed_line(screen, WHITE, (0, lower_west_dash), (intersection_left, lower_west_dash))
+            # Check for vehicles ahead while turning
+            for other_vehicle in vehicles_in_lane:
+                if other_vehicle != self and other_vehicle.x > self.x and abs(other_vehicle.y - self.y) < safe_threshold:
+                    self.speed = max(other_vehicle.speed - 0.5, 0)  # Adjust speed to avoid collision
+                    break
+            else:
+                # No vehicle ahead; allow speeding up to max_speed
+                self.speed = min(self.speed + 0.5, self.max_speed)
 
-        # East road dashed separators
-        draw_dashed_line(screen, WHITE, (intersection_right, upper_west_dash), (width, upper_west_dash))
-        draw_dashed_line(screen, WHITE, (intersection_right, lower_west_dash), (width, lower_west_dash))
+            # Move the vehicle along the eastward path
+            buffer_distance = 50  # Allow vehicles to move 50 pixels beyond screen width
+            if self.vehicle_type == "car":
+                if self.x < screen_width + buffer_distance:  # Continue moving right until off-screen
+                    self.x += self.speed
+                else:
+                    # Once off-screen horizontally (with buffer), reset the car
+                    self.is_turning = False
+                    self.y = random.randint(-screen_height, -50)
+                    self.x = 850  # Reset to initial lane position
+                    self.angle = 0  # Reset angle to face south
+                    total_vehicles_passed += 1
 
-                # North road dashed separators (adjusting distance between two dashed lines on each side)
-        # Keep spacing consistent for dashed lines on the same side of the center
-        outer_spacing = lane_width  # Distance for the outer dashed lines (unchanged)
-        inner_spacing = lane_width + 85 # Slightly increased for more distance on the same side
+            elif self.vehicle_type == "motorcycle":
+                # Move motorcycle to (800, 530) after turning
+                if self.y < 530:
+                    self.y += self.speed  # Move south after turning east
+                elif self.x < screen_width + buffer_distance:  # Continue moving right until off-screen
+                    self.x += self.speed
+                else:
+                    # Once off-screen horizontally (with buffer), reset the motorcycle
+                    self.is_turning = False
+                    self.y = random.randint(-screen_height, -50)
+                    self.x = 795  # Reset to initial lane position
+                    self.angle = 0  # Reset angle to face south
+                    total_vehicles_passed += 1
 
-        # Outer dashed lines (same as before)
-        left_north_dash_1 = north_south_center - outer_spacing - lane_width // 2
-        right_north_dash_1 = north_south_center + outer_spacing + lane_width // 2
+            return  # Skip further movement logic for turning vehicles
 
-        # Inner dashed lines (adjusted spacing between dashed lines on the same side)
-        left_north_dash_2 = north_south_center - inner_spacing - lane_width // 2
-        right_north_dash_2 = north_south_center + inner_spacing + lane_width // 2
+        # Normal movement logic for vehicles moving straight
+        closest_vehicle = None
+        closest_distance = float('inf')
 
-        # Draw the dashed lines on each side of the north road
-        draw_dashed_line(screen, WHITE, (left_north_dash_1, 0), (left_north_dash_1, intersection_top + dash_length))
-        draw_dashed_line(screen, WHITE, (right_north_dash_1, 0), (right_north_dash_1, intersection_top + dash_length))
-        
-        draw_dashed_line(screen, WHITE, (left_north_dash_2, 0), (left_north_dash_2, intersection_top + dash_length))
-        draw_dashed_line(screen, WHITE, (right_north_dash_2, 0), (right_north_dash_2, intersection_top + dash_length))
+        # Find the closest vehicle ahead
+        for other_vehicle in vehicles_in_lane:
+            if other_vehicle != self and other_vehicle.y > self.y:
+                distance = other_vehicle.y - self.y
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_vehicle = other_vehicle
 
-        pygame.display.flip()
-        clock.tick(60)
+        # Adjust speed based on distance to the closest vehicle
+        if closest_vehicle:
+            if closest_distance < safe_threshold:
+                self.speed = max(closest_vehicle.speed - 0.5, 0)  # Slow down to avoid collision
+            elif closest_distance > 70:
+                self.speed = min(self.max_speed, self.original_speed + 0.5)  # Speed up
+            else:
+                self.speed = self.original_speed  # Maintain original speed
+        else:
+            self.speed = self.max_speed  # No vehicle ahead, move at max speed
 
-except KeyboardInterrupt:
-    pygame.quit()
-    print("Program exited gracefully.")
+        self.y += self.speed
+
+        # If off-screen, reset position and count as passed
+        if self.y > screen_height:
+            self.y = random.randint(-screen_height, -50)
+            total_vehicles_passed += 1
+
+
+
+    def draw(self, surface):
+        # Create a surface for rotation
+        vehicle_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        if self.vehicle_type == "motorcycle":
+            pygame.draw.ellipse(
+                vehicle_surface,
+                YELLOW,
+                (0, 0, self.width, self.height),
+            )
+        elif self.vehicle_type == "car":
+            pygame.draw.rect(
+                vehicle_surface,
+                WHITE,
+                (0, 0, self.width, self.height),
+            )
+        # Rotate the vehicle and blit it onto the main surface
+        rotated_surface = pygame.transform.rotate(vehicle_surface, -self.angle)
+        rotated_rect = rotated_surface.get_rect(center=(self.x, self.y))
+        surface.blit(rotated_surface, rotated_rect)
+
+
+# Create vehicles for each lane
+vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
+
+
+# Timers for each lane position
+timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_positions + car_positions)}
+for timer in timers.values():
+    pygame.time.set_timer(timer, 1000)  # Generate a new vehicle every second
+
+
+# Main loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+
+        # Generate vehicles for each lane position
+        for pos, timer in timers.items():
+            if event.type == timer:
+                # Generate vehicle type based on probability
+                vehicle_type = random.choices(
+                    ["motorcycle", "car"], [0.65, 0.35], k=1
+                )[0]
+
+
+                # Set the safe threshold based on vehicle type
+                if vehicle_type == "motorcycle":
+                    safe_threshold = motorcycle_safe_threshold  # Safe distance for motorcycles
+                else:
+                    safe_threshold = car_safe_threshold  # Safe distance for cars
+
+
+                # Generate motorcycles in the middle lanes and cars in the outer lanes
+                if pos in motorcycle_positions and vehicle_type == "motorcycle":
+                    if not vehicles[pos] or vehicles[pos][-1].y > safe_threshold:
+                        new_vehicle = Vehicle(vehicle_type, pos)
+                        vehicles[pos].append(new_vehicle)
+                elif pos in car_positions and vehicle_type == "car":
+                    if not vehicles[pos] or vehicles[pos][-1].y > safe_threshold:
+                        new_vehicle = Vehicle(vehicle_type, pos)
+                        vehicles[pos].append(new_vehicle)
+
+
+    # Draw the background
+    screen.blit(background_image, (0, 0))
+
+
+    # Update and draw vehicles
+    for lane, lane_vehicles in vehicles.items():
+        for vehicle in lane_vehicles:
+            vehicle.move(lane_vehicles, safe_threshold)
+            vehicle.draw(screen)
+
+
+    # Display the total number of vehicles passed
+    font = pygame.font.Font(None, 24)
+    text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
+    screen.blit(text, (10, 10))
+
+
+    pygame.display.flip()
+    pygame.time.delay(20)  # Reduced delay for smoother and faster simulation
+
 
 pygame.quit()
+sys.exit()
+
+
