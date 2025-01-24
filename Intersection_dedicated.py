@@ -45,7 +45,7 @@ dash_coordinates = [
 dash_length = 20  # Length of the dash
 dash_thickness = 5  # Thickness of the dash
 dash_colors = {coord: (255, 0, 0) for coord in dash_coordinates}  # Red initially
-color_change_time = 5000  # Time interval in milliseconds
+color_change_time = 10000  # Time interval in milliseconds
 last_color_change = pygame.time.get_ticks()
 current_green_index = 0
 
@@ -69,7 +69,8 @@ class Vehicle:
         self.original_speed = self.speed
         self.is_turning = False  # Tracks if the vehicle is turning
         self.angle = 0  # Initial angle (facing south)
-
+        self.has_crossed_light = False  # Tracks if the vehicle has crossed the traffic light
+        self.has_been_counted = False  # Initialize counting flag
 
         # Vehicle size
         if vehicle_type == "motorcycle":
@@ -79,16 +80,13 @@ class Vehicle:
             self.width = random.randint(20, 30)  # Width for cars
             self.height = random.randint(40, 50)  # Length for cars
 
-
         # Randomly decide if vehicle will turn west or go straight for specific lanes
         self.turn_west = False
         if self.x in [680, 760]:  # Only for lanes 680 and 760
             self.turn_west = random.random() < 0.5  # 50% chance of turning west
 
-
     def move(self, vehicles_in_lane, safe_threshold):
         global total_vehicles_passed
-
 
         # Coordinates for east and west turning points
         car_turning_x, car_turning_y = 845, 470  # East turn for cars
@@ -96,6 +94,40 @@ class Vehicle:
         car_turning_x1, car_turning_y1 = 680, 590  # West turn for cars
         bike_turning_x1, bike_turning_y1 = 760, 640  # West turn for motorcycles
 
+        # Traffic light logic for lanes 760 and 680
+        if self.x in (760, 680):  # Only apply to lanes 760 (motorcycles) and 680 (cars)
+            light_color = dash_colors.get((self.x, 420), (255, 0, 0))  # Default to red if no light is found
+            light_stop_y = 370  # 50 units before the traffic dash line
+
+            # Stop vehicles at 50 units before the dash line for red light
+            if light_color == (255, 0, 0):  # If light is red
+                if self.y + self.height < light_stop_y:  # Approaching the stop line
+                    # Stop the first vehicle at the defined distance
+                    self.speed = 0  # Stop vehicle
+                else:
+                    # Queue logic: Vehicles behind stop at a safe distance
+                    closest_vehicle = None
+                    closest_distance = float('inf')
+
+                    # Find the closest vehicle ahead
+                    for other_vehicle in vehicles_in_lane:
+                        if other_vehicle != self and other_vehicle.y > self.y:
+                            distance = other_vehicle.y - self.y
+                            if distance < closest_distance:
+                                closest_distance = distance
+                                closest_vehicle = other_vehicle
+
+                    # Adjust speed for vehicles behind
+                    if closest_vehicle:
+                        if closest_distance < 50:  # Maintain 50 units of distance
+                            self.speed = max(0, closest_vehicle.speed - 0.5)  # Gradually stop
+                        else:
+                            self.speed = self.original_speed  # Resume normal speed
+                    else:
+                        self.speed = self.original_speed  # No vehicle ahead, move normally
+
+                self.y += self.speed  # Update position based on speed
+                return  # Skip further logic for these lanes when stopping for the light
 
         # Handle turning logic
         if not self.is_turning:
@@ -118,14 +150,12 @@ class Vehicle:
                     self.y = bike_turning_y1
                     self.angle = 270  # Face west
 
-
         if self.is_turning:
             # Handle eastward and westward turning movement
             if self.angle == 90:  # Eastward movement
                 self.x += self.speed
             elif self.angle == 270:  # Westward movement
                 self.x -= self.speed
-
 
             # After turning, reset speed to original speed and avoid unnecessary slowdowns
             if self.x > screen_width + 50 or self.x < -50:  # Buffer distance
@@ -140,11 +170,9 @@ class Vehicle:
                 total_vehicles_passed += 1
             return  # Skip further movement logic during turning
 
-
         # Normal movement logic for vehicles moving straight
         closest_vehicle = None
         closest_distance = float('inf')
-
 
         # Find the closest vehicle ahead
         for other_vehicle in vehicles_in_lane:
@@ -166,24 +194,22 @@ class Vehicle:
         else:
             self.speed = self.max_speed  # No vehicle ahead, move at max speed
 
-
         self.y += self.speed
 
-
         # If off-screen, reset position and count as passed
-        if self.y > screen_height:
-            self.y = random.randint(-screen_height, -50)
+        if self.y > screen_height and not self.has_been_counted:
+            self.has_been_counted = True  # Mark the vehicle as counted
             total_vehicles_passed += 1
-
-
+            print(f"Vehicle passed: {self.vehicle_type}. Total passed: {total_vehicles_passed}")
+            self.reset_vehicle() 
 
 
     def reset_vehicle(self):
-        global total_vehicles_passed
         self.y = random.randint(-screen_height, -50)
         self.speed = self.original_speed
         self.is_turning = False
-        total_vehicles_passed += 1
+        self.has_crossed_light = False
+        self.has_been_counted = False  # Reset the counted flag
 
 
     def draw(self, surface):
