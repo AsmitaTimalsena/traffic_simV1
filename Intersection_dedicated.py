@@ -2,7 +2,9 @@ import pygame
 import random
 import sys
 
+
 pygame.init()
+
 
 # Screen dimensions
 screen_width = 1280
@@ -10,14 +12,17 @@ screen_height = 800
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("North Road Vehicle Simulation")
 
+
 # Colors
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 
+
 # Load and scale the background image
 background_image = pygame.image.load("dedicated_laneIMG.png")
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
+
 
 # Global variables
 total_vehicles_passed = 0
@@ -25,18 +30,17 @@ motorcycle_positions = [760, 795]  # Middle lanes for motorcycles
 car_positions = [680, 850]        # Outer lanes for cars
 motorcycle_safe_threshold = 50  # Safe distance for motorcycles
 car_safe_threshold = 180  # Increased safe distance for cars
+max_vehicles_per_lane = 15  # Limit the number of vehicles in each lane
 
+
+# Traffic light settings
 dash_coordinates = [
-    # Traffic lights
-    # north road
     (760, 420), (680, 420),
-    # East road
     (880, 590),
-    # South road
     (600, 690),
-    # West road
     (400, 520),
 ]
+
 
 dash_length = 20  # Length of the dash
 dash_thickness = 5  # Thickness of the dash
@@ -45,13 +49,13 @@ color_change_time = 5000  # Time interval in milliseconds
 last_color_change = pygame.time.get_ticks()
 current_green_index = 0
 
+
 directions = [
     [(760, 420), (680, 420)],  # North
     [(600, 690)],  # South
     [(880, 590)],  # East
     [(400, 520)],  # West
 ]
-
 
 
 # Vehicle class
@@ -66,6 +70,7 @@ class Vehicle:
         self.is_turning = False  # Tracks if the vehicle is turning
         self.angle = 0  # Initial angle (facing south)
 
+
         # Vehicle size
         if vehicle_type == "motorcycle":
             self.width = random.randint(8, 12)  # Narrower width for a sleek look
@@ -74,14 +79,23 @@ class Vehicle:
             self.width = random.randint(20, 30)  # Width for cars
             self.height = random.randint(40, 50)  # Length for cars
 
+
+        # Randomly decide if vehicle will turn west or go straight for specific lanes
+        self.turn_west = False
+        if self.x in [680, 760]:  # Only for lanes 680 and 760
+            self.turn_west = random.random() < 0.5  # 50% chance of turning west
+
+
     def move(self, vehicles_in_lane, safe_threshold):
         global total_vehicles_passed
+
 
         # Coordinates for east and west turning points
         car_turning_x, car_turning_y = 845, 470  # East turn for cars
         bike_turning_x, bike_turning_y = 800, 530  # East turn for motorcycles
         car_turning_x1, car_turning_y1 = 680, 590  # West turn for cars
         bike_turning_x1, bike_turning_y1 = 760, 640  # West turn for motorcycles
+
 
         # Handle turning logic
         if not self.is_turning:
@@ -90,7 +104,7 @@ class Vehicle:
                     self.is_turning = True
                     self.y = car_turning_y
                     self.angle = 90  # Face east
-                elif self.x == 680 and self.y >= car_turning_y1:  # Turning west
+                elif self.x == 680 and self.y >= car_turning_y1 and self.turn_west:  # Turning west
                     self.is_turning = True
                     self.y = car_turning_y1
                     self.angle = 270  # Face west
@@ -99,10 +113,11 @@ class Vehicle:
                     self.is_turning = True
                     self.y = bike_turning_y
                     self.angle = 90  # Face east
-                elif self.x == 760 and self.y >= bike_turning_y1:  # Turning west
+                elif self.x == 760 and self.y >= bike_turning_y1 and self.turn_west:  # Turning west
                     self.is_turning = True
                     self.y = bike_turning_y1
                     self.angle = 270  # Face west
+
 
         if self.is_turning:
             # Handle eastward and westward turning movement
@@ -110,6 +125,7 @@ class Vehicle:
                 self.x += self.speed
             elif self.angle == 270:  # Westward movement
                 self.x -= self.speed
+
 
             # After turning, reset speed to original speed and avoid unnecessary slowdowns
             if self.x > screen_width + 50 or self.x < -50:  # Buffer distance
@@ -124,9 +140,11 @@ class Vehicle:
                 total_vehicles_passed += 1
             return  # Skip further movement logic during turning
 
+
         # Normal movement logic for vehicles moving straight
         closest_vehicle = None
         closest_distance = float('inf')
+
 
         # Find the closest vehicle ahead
         for other_vehicle in vehicles_in_lane:
@@ -135,6 +153,7 @@ class Vehicle:
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_vehicle = other_vehicle
+
 
         # Adjust speed based on distance to the closest vehicle
         if closest_vehicle:
@@ -147,12 +166,17 @@ class Vehicle:
         else:
             self.speed = self.max_speed  # No vehicle ahead, move at max speed
 
+
         self.y += self.speed
+
 
         # If off-screen, reset position and count as passed
         if self.y > screen_height:
             self.y = random.randint(-screen_height, -50)
             total_vehicles_passed += 1
+
+
+
 
     def reset_vehicle(self):
         global total_vehicles_passed
@@ -160,6 +184,7 @@ class Vehicle:
         self.speed = self.original_speed
         self.is_turning = False
         total_vehicles_passed += 1
+
 
     def draw(self, surface):
         vehicle_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -175,6 +200,7 @@ class Vehicle:
 # Create vehicles for each lane
 vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
 
+
 # Timers for each lane position
 timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_positions + car_positions)}
 for timer in timers.values():
@@ -188,7 +214,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        # Generate vehicles for each lane position
+
         # Generate vehicles for each lane position
         for pos, timer in timers.items():
             if event.type == timer:
@@ -197,25 +223,28 @@ while running:
                     ["motorcycle", "car"], [0.65, 0.35], k=1
                 )[0]
 
+
                 # Set the safe threshold based on vehicle type
                 if vehicle_type == "motorcycle":
                     safe_threshold = motorcycle_safe_threshold  # Safe distance for motorcycles
                 else:
                     safe_threshold = car_safe_threshold  # Safe distance for cars
 
+
                 # Generate motorcycles in the middle lanes and cars in the outer lanes
                 if pos in motorcycle_positions and vehicle_type == "motorcycle":
-                    if not vehicles[pos] or vehicles[pos][-1].y > safe_threshold:
+                    if len(vehicles[pos]) < max_vehicles_per_lane and (not vehicles[pos] or vehicles[pos][-1].y > safe_threshold):
                         new_vehicle = Vehicle(vehicle_type, pos)
                         vehicles[pos].append(new_vehicle)
                 elif pos in car_positions and vehicle_type == "car":
-                    if not vehicles[pos] or vehicles[pos][-1].y > safe_threshold:
+                    if len(vehicles[pos]) < max_vehicles_per_lane and (not vehicles[pos] or vehicles[pos][-1].y > safe_threshold):
                         new_vehicle = Vehicle(vehicle_type, pos)
                         vehicles[pos].append(new_vehicle)
 
 
     # Get the current time
     current_time = pygame.time.get_ticks()
+
 
     # Change traffic light colors every 5 seconds
     if current_time - last_color_change >= color_change_time:
@@ -229,8 +258,10 @@ while running:
         current_green_index = (current_green_index + 1) % len(directions)
         last_color_change = current_time
 
+
     # Draw the background
     screen.blit(background_image, (0, 0))
+
 
     for (x, y) in dash_coordinates:
         if x == 880 or x == 400:  # East and West roads (vertical dashes)
@@ -242,16 +273,19 @@ while running:
     # Update and draw vehicles
     for lane, lane_vehicles in vehicles.items():
         for vehicle in lane_vehicles:
-            vehicle.move(lane_vehicles, safe_threshold)
+            vehicle.move(lane_vehicles, car_safe_threshold if lane in car_positions else motorcycle_safe_threshold)
             vehicle.draw(screen)
+
 
     # Display the total number of vehicles passed
     font = pygame.font.Font(None, 24)
     text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
     screen.blit(text, (10, 10))
 
+
     pygame.display.flip()
-    pygame.time.delay(10)  # Reduced delay for smoother and faster simulation
+    pygame.time.Clock().tick(60)  # Adjust frame rate for smoother simulation
+
 
 pygame.quit()
 sys.exit()
