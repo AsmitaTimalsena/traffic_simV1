@@ -1,14 +1,8 @@
-
 import pygame
 import random
 import sys
 
-
-
-
 pygame.init()
-
-
 
 
 # Screen dimensions
@@ -18,21 +12,15 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("North Road Vehicle Simulation")
 
 
-
-
 # Colors
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 
 
-
-
 # Load and scale the background image
 background_image = pygame.image.load("dedicated_laneIMG.png")
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
-
-
 
 
 # Global variables
@@ -42,7 +30,6 @@ car_positions = [680, 850]        # Outer lanes for cars
 motorcycle_safe_threshold = 50  # Safe distance for motorcycles
 car_safe_threshold = 180  # Increased safe distance for cars
 max_vehicles_per_lane = 10  # Limit the number of vehicles in each lane
-
 
 dash_coordinates = [
     # Traffic lights
@@ -63,9 +50,13 @@ dash_length = 20  # Length of the dash
 dash_thickness = 5  # Thickness of the dash
 
 
+
+
 # Initial color for traffic lights
 dash_colors = {coord: (255, 0, 0) for coord in dash_coordinates}  # Red initially
 current_green_index = 0
+
+
 
 
 directions = [
@@ -74,6 +65,8 @@ directions = [
     [(880, 590)],  # East
     [(400, 520)],  # West
 ]
+
+
 
 
 for coord in directions[current_green_index]:
@@ -102,6 +95,7 @@ class Vehicle:
         self.has_crossed_light = False  # Tracks if the vehicle has crossed the traffic light
         self.has_been_counted = False  # Initialize counting flag
 
+
         # Vehicle size
         if vehicle_type == "motorcycle":
             self.width = random.randint(8, 12)  # Narrower width for a sleek look
@@ -115,6 +109,8 @@ class Vehicle:
         self.turn_west = False
         if self.x in [680, 760]:  # Only for lanes 680 and 760
             self.turn_west = random.random() < 0.5  # 50% chance of turning west
+
+
 
 
     def move(self, vehicles_in_lane, safe_threshold):
@@ -131,41 +127,49 @@ class Vehicle:
         # Traffic light logic for lanes 760 and 680
         if self.x in (760, 680):  # Only apply to lanes 760 (motorcycles) and 680 (cars)
             light_color = dash_colors.get((self.x, 420), (255, 0, 0))  # Default to red if no light is found
-            light_stop_y = 370  # 50 units before the traffic dash line
+            light_stop_y = 410 # 20 units before the traffic dash line
 
 
-            # Stop vehicles at 50 units before the dash line for red light
-            if light_color == (255, 0, 0):  # If light is red
-                if self.y + self.height < light_stop_y: # Approaching the stop line
-                    # Stop the first vehicle at the defined distance
-                    self.speed = 0  # Stop vehicle
-                else:
-                    # Queue logic: Vehicles behind stop at a safe distance
-                    closest_vehicle = None
-                    closest_distance = float('inf')
+            distance_to_light = light_stop_y - (self.y + self.height)
 
 
-                    # Find the closest vehicle ahead
-                    for other_vehicle in vehicles_in_lane:
-                        if other_vehicle != self and other_vehicle.y > self.y:
-                            distance = other_vehicle.y - self.y
-                            if distance < closest_distance:
-                                closest_distance = distance
-                                closest_vehicle = other_vehicle
-
-
-                    # Adjust speed for vehicles behind
-                    if closest_vehicle:
-                        if closest_distance < 50:  # Maintain 50 units of distance
-                            self.speed = max(0, closest_vehicle.speed - 0.5)  # Gradually stop
-                        else:
-                            self.speed = self.original_speed  # Resume normal speed
+            # Check if the vehicle has already crossed the light
+            if not self.has_crossed_light:
+                if light_color == (0, 255, 0):  # Green light
+                    if distance_to_light <= 0:
+                        self.has_crossed_light = True  # Mark as having crossed the light
+                elif light_color == (255, 0, 0):  # Red light
+                    if distance_to_light <= 30 and distance_to_light > 0:  # If within stopping range
+                        self.speed = max(0, self.speed - 0.5)  # Gradually stop
+                        if distance_to_light <= 5:  # Close enough to the stop line
+                            self.speed = 0
+                    elif distance_to_light <= 0:  # If already beyond the stopping point
+                        self.speed = self.original_speed  # Allow vehicle to continue
                     else:
-                        self.speed = self.original_speed  # No vehicle ahead, move normally
+                    # Queue logic: Vehicles behind maintain safe distance
+                        closest_vehicle = None
+                        closest_distance = float('inf')
 
+                        # Find the closest vehicle ahead
+                        for other_vehicle in vehicles_in_lane:
+                            if other_vehicle != self and other_vehicle.y > self.y:
+                                distance = other_vehicle.y - self.y
+                                if distance < closest_distance:
+                                    closest_distance = distance
+                                    closest_vehicle = other_vehicle
 
-                self.y += self.speed  # Update position based on speed
-                return  # Skip further logic for these lanes when stopping for the light
+                        # Adjust speed for vehicles behind
+                        if closest_vehicle:
+                            if closest_distance < 80:  # Maintain 80 units of distance
+                                self.speed = max(0, closest_vehicle.speed - 0.5)  # Gradually stop
+                            else:
+                                self.speed = self.original_speed  # Resume normal speed
+                        else:
+                            self.speed = self.original_speed  # No vehicle ahead, move normally
+
+                    self.y += self.speed  # Update position based on speed
+                    return  # Skip further logic for these lanes when stopping for the light
+
 
 
         # Handle turning logic
@@ -226,8 +230,6 @@ class Vehicle:
                     closest_vehicle = other_vehicle
 
 
-
-
         # Adjust speed based on distance to the closest vehicle
         if closest_vehicle:
             if closest_distance < safe_threshold:
@@ -259,6 +261,8 @@ class Vehicle:
         self.is_turning = False
         self.has_crossed_light = False
         self.has_been_counted = False  # Reset counting flag
+
+
 
 
     def draw(self, surface):
@@ -350,8 +354,12 @@ while running:
         last_color_change = current_time
 
 
+
+
     # Draw the background and traffic lights
     screen.blit(background_image, (0, 0))
+
+
 
 
     for (x, y) in dash_coordinates:
@@ -388,5 +396,3 @@ while running:
 
 pygame.quit()
 sys.exit()
-
-

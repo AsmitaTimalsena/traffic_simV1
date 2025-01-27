@@ -13,26 +13,38 @@ YELLOW = (255, 255, 0)
 
 total_vehicles_passed = 0
 
-# Updated velocity data for the new lanes
+# Real-world and simulation constants
+REAL_WORLD_HEIGHT = 200  # Real-world height in meters
+SCREEN_HEIGHT = 700  # Screen height in pixels
+FPS = 30  # Frames per second
+distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
+
 car_velocity_data = {45: {"total_speed": 0, "vehicle_count": 0}, 240: {"total_speed": 0, "vehicle_count": 0}}
 motorcycle_velocity_data = {120: {"total_speed": 0, "vehicle_count": 0}, 180: {"total_speed": 0, "vehicle_count": 0}}
 
 class Vehicle:
     def __init__(self, vehicle_type, lane_position):
+        """
+        Initializes a vehicle with its type and lane position.
+        """
         self.vehicle_type = vehicle_type
         self.x = lane_position
-        self.y = random.randint(-height, 0) 
-        self.max_speed = 3 if vehicle_type == "motorcycle" else 2
-        self.speed = random.uniform(1, 2) if vehicle_type == "motorcycle" else random.uniform(0.5, 1.5)
-        self.original_speed = self.speed  
+        self.y = random.randint(-height, 0)
+        self.max_speed = random.uniform(30, 35) if vehicle_type == "motorcycle" else random.uniform(25, 30)  # Max speed in kh/hr
+        self.speed = random.uniform(0.5 * self.max_speed, self.max_speed)  # Initial random speed
+        self.original_speed = self.speed  # Track the original speed
 
+        # Define vehicle size
         if vehicle_type == "motorcycle":
-            self.size = random.randint(8, 10) 
+            self.size = random.randint(8, 10)  # Size of motorcycles
         elif vehicle_type == "car":
-            self.width = random.randint(13, 20)
-            self.length = random.randint(23, 33)
+            self.width = random.randint(13, 20)  # Width of cars
+            self.length = random.randint(23, 33)  # Length of cars
 
     def fall(self, vehicles_in_lane, safe_threshold):
+        """
+        Adjusts the vehicle's speed and position based on the proximity of other vehicles in the same lane.
+        """
         global total_vehicles_passed, car_velocity_data, motorcycle_velocity_data
 
         closest_vehicle = None
@@ -49,120 +61,121 @@ class Vehicle:
         # Adjust speed based on proximity to the closest vehicle
         if closest_vehicle:
             if closest_distance < safe_threshold:
-                self.speed = max(closest_vehicle.speed - 0.5, 0)
+                # Too close, slow down to avoid collision
+                self.speed = max(closest_vehicle.speed - 1, 0)
             elif closest_distance > 70:
-                # Safe distance, increase speed slightly
+                # Increase speed if safe distance exists
                 self.speed = min(self.max_speed, self.original_speed + 0.5)
             else:
-                # Moderate distance, maintain original speed
+                # Maintain original speed
                 self.speed = self.original_speed
         else:
             # No vehicle ahead, move at maximum speed
             self.speed = self.max_speed
 
-        self.y += self.speed
+        # Convert speed to pixels/frame for simulation
+        speed_in_pixels = self.speed / distance_per_pixel / FPS
+        self.y += speed_in_pixels
 
-        # Update the velocity data for average calculation
-        if self.vehicle_type == "car":
-            if self.x == 45 or self.x == 240:  # Updated lanes for cars
-                lane = self.x
-                car_velocity_data[lane]["total_speed"] += self.speed
-                car_velocity_data[lane]["vehicle_count"] += 1
-        elif self.vehicle_type == "motorcycle":
-            if self.x == 120 or self.x == 180:  # Updated lanes for motorcycles
-                lane = self.x
-                motorcycle_velocity_data[lane]["total_speed"] += self.speed
-                motorcycle_velocity_data[lane]["vehicle_count"] += 1
+        # Update velocity data for averages
+        if self.vehicle_type == "car" and self.x in car_velocity_data:
+            lane = self.x
+            car_velocity_data[lane]["total_speed"] += self.speed
+            car_velocity_data[lane]["vehicle_count"] += 1
+        elif self.vehicle_type == "motorcycle" and self.x in motorcycle_velocity_data:
+            lane = self.x
+            motorcycle_velocity_data[lane]["total_speed"] += self.speed
+            motorcycle_velocity_data[lane]["vehicle_count"] += 1
 
-        # If the vehicle goes off-screen, reset its position and update the counter
-        if self.y > height:
-            self.y = random.randint(-height, 0)
-            total_vehicles_passed += 1  
+        # Reset position if vehicle goes off-screen
+        if self.y > SCREEN_HEIGHT:
+            self.y = random.randint(-SCREEN_HEIGHT, 0)
+            total_vehicles_passed += 1
 
     def draw(self, surface):
+        """
+        Draws the vehicle on the given surface.
+        """
         if self.vehicle_type == "motorcycle":
             oval_width = self.size * 2
-            oval_height = self.size     
-            pygame.draw.ellipse(surface, YELLOW, (self.x - oval_height // 2, int(self.y) - oval_width // 2, oval_height, oval_width))
+            oval_height = self.size
+            pygame.draw.ellipse(
+                surface,
+                YELLOW,
+                (self.x - oval_height // 2, int(self.y) - oval_width // 2, oval_height, oval_width),
+            )
         elif self.vehicle_type == "car":
-            pygame.draw.rect(surface, WHITE, (self.x, int(self.y), self.width, self.length))
+            pygame.draw.rect(
+                surface,
+                WHITE,
+                (self.x, int(self.y), self.width, self.length),
+            )
 
-# Updated lane positions
+
+
+# Lane positions
 motorcycle_positions = [120, 180]
 car_positions = [45, 240]
-
-vehicle_types = ["motorcycle", "car"]
-probabilities = [0.7, 0.3]  # 70% for motorcycles, 30% for cars
-
 vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
 
-safe_threshold = 50
+safe_threshold = 70
 
-# Timers for vehicle generation in lanes
+# Timers for lane-based vehicle generation
 timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_positions + car_positions)}
-
 for timer in timers.values():
     pygame.time.set_timer(timer, 1000)
 
+# Main loop
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        # Generate vehicles for each lane position independently
         for pos, timer in timers.items():
             if event.type == timer:
-                # Determine vehicle type based on lane position
-                if pos in motorcycle_positions:
-                    vehicle_type = "motorcycle"
-                elif pos in car_positions:
-                    vehicle_type = "car"
-                else:
-                    continue
-
-                # Add vehicles with minimal distance between them
-                if not vehicles[pos] or vehicles[pos][-1].y > 50:
-                    new_vehicle = Vehicle(vehicle_type, pos)
-                    vehicles[pos].append(new_vehicle)
+                vehicle_type = "motorcycle" if pos in motorcycle_positions else "car"
+                # Check that vehicles are spawned at reasonable intervals
+                if len(vehicles[pos]) == 0:
+                    vehicles[pos].append(Vehicle(vehicle_type, pos))
+                elif len(vehicles[pos]) > 0:
+                    last_vehicle = vehicles[pos][-1]
+                    # Ensure that vehicles spawn with some minimum distance apart
+                    if last_vehicle.y > 80:  # Allow spawning when the last vehicle is far enough
+                        vehicles[pos].append(Vehicle(vehicle_type, pos))
 
     screen.fill(BLUE)
-   
+
     # Draw lane markers
-    for y in range(0, height, 20):  # Adjust the step to control the gap size
-        pygame.draw.line(screen, WHITE, (90, y), (90, y + 10), 2)  
-        pygame.draw.line(screen, WHITE, (205, y), (205, y + 10), 2)  
-   
+    for y in range(0, height, 20):
+        pygame.draw.line(screen, WHITE, (90, y), (90, y + 10), 2)
+        pygame.draw.line(screen, WHITE, (205, y), (205, y + 10), 2)
     pygame.draw.line(screen, WHITE, (300, 0), (300, height), 5)
     pygame.draw.line(screen, WHITE, (310, 0), (310, height), 5)
 
-    # Update and draw vehicles (only in the first 400px wide area)
+    # Update and draw vehicles
     for lane, lane_vehicles in vehicles.items():
         for vehicle in lane_vehicles:
-            vehicle.fall(lane_vehicles, safe_threshold)  
-            if vehicle.x < 400:  
-                vehicle.draw(screen)
+            vehicle.fall(lane_vehicles, safe_threshold)
+            vehicle.draw(screen)
 
-    # Display vehicles passed (on the right side of the screen)
+    # Display metrics
     font = pygame.font.Font(None, 24)
-    text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
-    screen.blit(text, (450, 50))  
+    y_offset = 50
+    text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)
+    screen.blit(text, (450, y_offset))
 
-    # Display average velocity for cars (in lanes 45 and 240)
-    y_offset = 80  
+    y_offset += 30
     for lane in car_velocity_data:
-        if car_velocity_data[lane]["vehicle_count"] > 0:
-            avg_speed = car_velocity_data[lane]["total_speed"] / car_velocity_data[lane]["vehicle_count"]
-            text = font.render(f"Car Avg Speed (Lane {lane}): {avg_speed:.2f}", True, WHITE)
-            screen.blit(text, (450, y_offset))
-            y_offset += 30  
+        avg_speed = car_velocity_data[lane]["total_speed"] / car_velocity_data[lane]["vehicle_count"] if car_velocity_data[lane]["vehicle_count"] else 0
+        text = font.render(f"Car Avg Speed (Lane {lane}): {avg_speed:.2f} km/hr", True, WHITE)
+        screen.blit(text, (400, y_offset))
+        y_offset += 30
 
-    # Display average velocity for motorcycles (in lanes 120 and 180)
     for lane in motorcycle_velocity_data:
-        if motorcycle_velocity_data[lane]["vehicle_count"] > 0:
-            avg_speed = motorcycle_velocity_data[lane]["total_speed"] / motorcycle_velocity_data[lane]["vehicle_count"]
-            text = font.render(f"Motorcycle Avg Speed (Lane {lane}): {avg_speed:.2f}", True, WHITE)
-            screen.blit(text, (450, y_offset))
-            y_offset += 30 
+        avg_speed = motorcycle_velocity_data[lane]["total_speed"] / motorcycle_velocity_data[lane]["vehicle_count"] if motorcycle_velocity_data[lane]["vehicle_count"] else 0
+        text = font.render(f"Motorcycle Avg Speed (Lane {lane}): {avg_speed:.2f} km/hr", True, WHITE)
+        screen.blit(text, (400, y_offset))
+        y_offset += 30
 
     pygame.display.flip()
     pygame.time.delay(30)
