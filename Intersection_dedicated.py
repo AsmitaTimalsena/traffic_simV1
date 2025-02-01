@@ -43,20 +43,12 @@ dash_coordinates = [
     (400, 520),
 ]
 
-
-
-
 dash_length = 20  # Length of the dash
 dash_thickness = 5  # Thickness of the dash
-
-
-
 
 # Initial color for traffic lights
 dash_colors = {coord: (255, 0, 0) for coord in dash_coordinates}  # Red initially
 current_green_index = 0
-
-
 
 
 directions = [
@@ -66,19 +58,12 @@ directions = [
     [(400, 520)],  # West
 ]
 
-
-
-
 for coord in directions[current_green_index]:
     dash_colors[coord] = (0, 255, 0)  # Set the first direction's lights to green
 
 
-
-
 color_change_time = 30000  # Time interval in milliseconds
 last_color_change = pygame.time.get_ticks()
-
-
 
 
 # Vehicle class
@@ -105,13 +90,10 @@ class Vehicle:
             self.height = random.randint(40, 50)  # Length for cars
 
 
-        # Randomly decide if vehicle will turn west or go straight for specific lanes
-        self.turn_west = False
-        if self.x in [680, 760]:  # Only for lanes 680 and 760
-            self.turn_west = random.random() < 0.5  # 50% chance of turning west
-
-
-
+        # # Randomly decide if vehicle will turn west or go straight for specific lanes
+        # self.turn_west = False
+        # if self.x in [680, 760]:  # Only for lanes 680 and 760
+        #     self.turn_west = random.random() < 0.5  # 50% chance of turning west
 
     def move(self, vehicles_in_lane, safe_threshold):
         global total_vehicles_passed
@@ -120,8 +102,8 @@ class Vehicle:
         # Coordinates for east and west turning points
         car_turning_x, car_turning_y = 845, 470  # East turn for cars
         bike_turning_x, bike_turning_y = 800, 530  # East turn for motorcycles
-        car_turning_x1, car_turning_y1 = 680, 590  # West turn for cars
-        bike_turning_x1, bike_turning_y1 = 760, 640  # West turn for motorcycles
+        # car_turning_x1, car_turning_y1 = 680, 590  # West turn for cars
+        # bike_turning_x1, bike_turning_y1 = 760, 640  # West turn for motorcycles
 
 
         # Traffic light logic for lanes 760 and 680
@@ -170,8 +152,6 @@ class Vehicle:
                     self.y += self.speed  # Update position based on speed
                     return  # Skip further logic for these lanes when stopping for the light
 
-
-
         # Handle turning logic
         if not self.is_turning:
             if self.vehicle_type == "car":
@@ -179,27 +159,27 @@ class Vehicle:
                     self.is_turning = True
                     self.y = car_turning_y
                     self.angle = 90  # Face east
-                elif self.x == 680 and self.y >= car_turning_y1 and self.turn_west:  # Turning west
-                    self.is_turning = True
-                    self.y = car_turning_y1
-                    self.angle = 270  # Face west
+                # elif self.x == 680 and self.y >= car_turning_y1 and self.turn_west:  # Turning west
+                    # self.is_turning = True
+                    # self.y = car_turning_y1
+                    # self.angle = 270  # Face west
             elif self.vehicle_type == "motorcycle":
                 if self.x == 795 and self.y >= bike_turning_y:  # Turning east
                     self.is_turning = True
                     self.y = bike_turning_y
                     self.angle = 90  # Face east
-                elif self.x == 760 and self.y >= bike_turning_y1 and self.turn_west:  # Turning west
-                    self.is_turning = True
-                    self.y = bike_turning_y1
-                    self.angle = 270  # Face west
+                # elif self.x == 760 and self.y >= bike_turning_y1 and self.turn_west:  # Turning west
+                #     self.is_turning = True
+                #     self.y = bike_turning_y1
+                #     self.angle = 270  # Face west
 
 
         if self.is_turning:
             # Handle eastward and westward turning movement
             if self.angle == 90:  # Eastward movement
                 self.x += self.speed
-            elif self.angle == 270:  # Westward movement
-                self.x -= self.speed
+            # elif self.angle == 270:  # Westward movement
+            #     self.x -= self.speed
 
 
             # After turning, reset speed to original speed and avoid unnecessary slowdowns
@@ -252,18 +232,12 @@ class Vehicle:
                 self.has_been_counted = True
             self.reset_vehicle()
 
-
-
-
     def reset_vehicle(self):
         self.y = random.randint(-screen_height, -50)
         self.speed = self.original_speed
         self.is_turning = False
         self.has_crossed_light = False
         self.has_been_counted = False  # Reset counting flag
-
-
-
 
     def draw(self, surface):
         vehicle_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -275,22 +249,13 @@ class Vehicle:
         rotated_rect = rotated_surface.get_rect(center=(self.x, self.y))
         surface.blit(rotated_surface, rotated_rect)
 
-
-
-
 # Create vehicles for each lane
 vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
-
-
-
 
 # Timers for each lane position
 timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_positions + car_positions)}
 for timer in timers.values():
     pygame.time.set_timer(timer, 1000)  # Generate a new vehicle every second
-
-
-
 
 # Main loop
 running = True
@@ -385,13 +350,8 @@ while running:
     text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
     screen.blit(text, (10, 10))
 
-
-
-
     pygame.display.flip()
     pygame.time.Clock().tick(60)  # Adjust frame rate for smoother simulation
-
-
 
 
 pygame.quit()

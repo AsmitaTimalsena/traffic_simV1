@@ -1,8 +1,8 @@
-import pygame
+import pygame 
 import random
 
 pygame.init()
-# Screen dimensions
+
 width, height = 300, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Shared lanes vehicle simulation')
@@ -12,154 +12,131 @@ WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 
+# Speed conversion (1 pixel = 5 meters, 60 FPS)
+FPS = 60
+METERS_PER_PIXEL = 5  # Adjusted scale
+
+# Vehicle speed ranges in km/h
+BIKE_SPEED_KMH = random.randint(35, 40)  # km/h
+CAR_SPEED_KMH = random.randint(30, 35)   # km/h
+
+BIKE_SPEED_PIXELS = (BIKE_SPEED_KMH * 1000) / (60 * 60 * METERS_PER_PIXEL)
+CAR_SPEED_PIXELS = (CAR_SPEED_KMH * 1000) / (60 * 60 * METERS_PER_PIXEL)
+
+# Vehicle settings
+lanes = [45, 120, 180, 240]
+SEPARATION_DISTANCE = 70
+LANE_CHANGE_DISTANCE = 120
+OVERTAKE_DISTANCE = 50  
+
+# Initialize total vehicles passed counter
+total_vehicles_passed = 0
+
 class Vehicle:
-    def __init__(self, vehicle_type, lane_position):
-        self.vehicle_type = vehicle_type
-        self.x = lane_position  # Assigned specific lane position
-        self.y = random.randint(-height, 0)  # Start above the screen
-        self.speed = random.uniform(1, 2) if vehicle_type == "motorcycle" else random.uniform(0.5, 1.5)
-        self.original_speed = self.speed  # Keep track of the original speed
-        self.max_speed = self.speed * 1.5  # Vehicles can increase speed up to 1.5x original
+    def __init__(self, x, y, lane, vtype):
+        self.x = x
+        self.y = y
+        self.lane = lane
+        self.vtype = vtype
+        
+        self.speed = (random.randint(35, 40) if vtype == "bike" else random.randint(30, 35)) * 1000 / (60 * 60 * METERS_PER_PIXEL)
+        
+        if vtype == "car":
+            self.width = random.randint(18, 22)
+            self.height = random.randint(30, 32)
+        else:
+            self.width = random.randint(12, 15)
+            self.height = random.randint(25, 30)
+        
+        self.target_lane = self.lane
+        self.lane_change_progress = 1
 
-        # Define size
-        if vehicle_type == "motorcycle":
-            self.size = random.randint(8, 10)  # Diameter of the motorcycle (circle)
-            self.width = self.size * 2  # Width of the motorcycle for lane check
-        elif vehicle_type == "car":
-            self.width = random.randint(13, 20)  # Width of the car
-            self.length = random.randint(23, 33)  # Length of the car
+    def draw(self, screen):
+        if self.vtype == "car":
+            pygame.draw.rect(screen, WHITE, (self.x, self.y, self.width, self.height))
+        else:
+            pygame.draw.ellipse(screen, YELLOW, (self.x, self.y, self.width, self.height))
 
-        self.target_x = self.x  # target_x to smoothly transition lanes
-        self.transitioning = False  # Flag to ensure only one lane change at a time
-
-    def fall(self, vehicles_in_lane, adjacent_lane_vehicles, safe_threshold, ample_space):
-        global vehicle_passed_count
-
-        # Default to max speed
-        self.speed = min(self.speed + 0.02, self.max_speed)
-
-        # Adjust speed or stop based on distance to the preceding vehicle
-        for other_vehicle in vehicles_in_lane:
-            if other_vehicle != self and other_vehicle.y > self.y:  # Check vehicles ahead
-                distance = other_vehicle.y - self.y
-                if distance < safe_threshold:  # Too close
-                    self.speed = 0  # Stop moving temporarily
-
-                    # Attempt to change lanes if motorcycle
-                    if self.vehicle_type == "motorcycle" and not self.transitioning:
-                        if adjacent_lane_vehicles is not None:
-                            can_switch_lane = True
-                            for adj_vehicle in adjacent_lane_vehicles:
-                                if abs(adj_vehicle.y - self.y) < ample_space:
-                                    can_switch_lane = False
-                                    break
-                            if can_switch_lane:
-                                self.target_x = adjacent_lane_vehicles[0].x if adjacent_lane_vehicles else self.x
-                                self.transitioning = True
-                                break
-                    break
-
-        # Attempt more frequent lane changes for motorcycles
-        if self.vehicle_type == "motorcycle" and not self.transitioning:
-            if adjacent_lane_vehicles is not None:
-                can_switch_lane = True
-                for adj_vehicle in adjacent_lane_vehicles:
-                    if abs(adj_vehicle.y - self.y) < ample_space:
-                        can_switch_lane = False
-                        break
-                if can_switch_lane:
-                    self.target_x = adjacent_lane_vehicles[0].x if adjacent_lane_vehicles else self.x
-                    self.transitioning = True
-
-        # Smoothly move towards the target_x position
-        if self.x < self.target_x:
-            self.x += 0.5  # Move to the right smoothly
-        elif self.x > self.target_x:
-            self.x -= 0.5  # Move to the left smoothly
-
-        # Update position
+    def move(self):
+        if self.lane_change_progress < 1:
+            self.x += (self.target_lane - self.x) * 0.1
+            if abs(self.x - self.target_lane) < 1:
+                self.x = self.target_lane
+                self.lane = self.target_lane
+                self.lane_change_progress = 1
         self.y += self.speed
 
-        # Reset if it goes off-screen
-        if self.y > height:
-            self.y = random.randint(-height, 0)
-            vehicle_passed_count += 1  # Increment vehicle passed count
-            self.transitioning = False  # Reset transition state when the vehicle resets
+    def adjust_speed(self, vehicles):
+        for other in vehicles:
+            if other != self and other.lane == self.lane:
+                distance = other.y - self.y
+                if 0 < distance < SEPARATION_DISTANCE:
+                    self.speed = max(self.speed * 0.5, 1)
+                    return
+                elif 0 < distance < LANE_CHANGE_DISTANCE:
+                    self.speed = max(self.speed * 0.8, 1)
+                    return
+        self.speed = (random.randint(35, 40) if self.vtype == "bike" else random.randint(30, 35)) * 1000 / (60 * 60 * METERS_PER_PIXEL)
 
-    def draw(self, surface):
-        if self.vehicle_type == "motorcycle":
-            # Draw an oval instead of a circle
-            oval_width = self.size * 2  # Make the oval slightly wider than the size
-            oval_height = self.size     # Use the size as the height
-            pygame.draw.ellipse(surface, YELLOW, (self.x - oval_height // 2, int(self.y) - oval_width // 2, oval_height, oval_width))
-        elif self.vehicle_type == "car":
-            pygame.draw.rect(surface, WHITE, (self.x, int(self.y), self.width, self.length))
+    def attempt_lane_change(self, vehicles):
+        if self.vtype != "bike":
+            return  
+        
+        for other in vehicles:
+            if other != self and other.lane == self.lane:
+                distance = other.y - self.y
+                if 0 < distance < OVERTAKE_DISTANCE:
+                    random.shuffle(lanes)  # Shuffle lanes to avoid biased selection
+                    for target_lane in lanes:
+                        if target_lane != self.lane and self.can_change_lane(vehicles, target_lane):
+                            self.target_lane = target_lane
+                            self.lane_change_progress = 0
+                            return
+                    self.speed = max(self.speed * 0.5, 1)
+                    return
+    
+    def can_change_lane(self, vehicles, target_lane):
+        for other in vehicles:
+            if other.lane == target_lane and abs(other.y - self.y) < SEPARATION_DISTANCE:
+                return False  
+        return True
 
-# Predefined lane positions
-lane_positions = [45, 120, 180, 240]
+vehicles = []
+for i in range(10):
+    lane = random.choice(lanes)
+    vtype = random.choices(["bike", "car"], weights=[65, 35])[0]
+    x = lane
+    y = random.randint(-height, 0)
+    vehicles.append(Vehicle(x, y, lane, vtype))
 
-# Define probabilities for vehicle types
-vehicle_types = ["motorcycle", "car"]
-probabilities = [0.63, 0.35]  # 65% for motorcycles, 35% for cars
-
-# Create a dictionary to store vehicles for each lane
-vehicles = {pos: [] for pos in lane_positions}  # Separate list for each lane position
-
-# Safe distance threshold
-safe_threshold = 70
-ample_space = 120
-
-# Timers for each lane position
-timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(lane_positions)}
-
-# Set 3-second timers for each lane position
-for timer in timers.values():
-    pygame.time.set_timer(timer, 3000)
-
-# Vehicle passed count
-vehicle_passed_count = 0
-
-# Main loop
 running = True
+clock = pygame.time.Clock()
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        # Generate vehicles for each lane position independently
-        for pos, timer in timers.items():
-            if event.type == timer:
-                vehicle_type = random.choices(vehicle_types, probabilities)[0]
-                new_vehicle = Vehicle(vehicle_type, pos)
-                vehicles[pos].append(new_vehicle)
 
     screen.fill(BLUE)
+    dash_length = 20
+    gap_length = 10
+    start_x = 150
 
-    for y in range(0, height, 20):  # Adjust the step to control the gap size
-        pygame.draw.line(screen, WHITE, (150, y), (150, y + 10), 2) 
+    for y in range(0, height, dash_length + gap_length):
+        pygame.draw.line(screen, WHITE, (start_x, y), (start_x, y + dash_length), 2)
 
-    # Update and draw vehicles
-    for lane in lane_positions:
-        adjacent_lane_vehicles = None
-        if lane == 45:
-            adjacent_lane_vehicles = vehicles[120]
-        elif lane == 120:
-            adjacent_lane_vehicles = vehicles[45] + vehicles[180]
-        elif lane == 180:
-            adjacent_lane_vehicles = vehicles[120] + vehicles[240]
-        elif lane == 240:
-            adjacent_lane_vehicles = vehicles[180]
+    for vehicle in vehicles:
+        vehicle.adjust_speed(vehicles)
+        vehicle.attempt_lane_change(vehicles)
+        vehicle.move()
+        if vehicle.y > height:
+            vehicle.y = random.randint(-height, 0)
+            total_vehicles_passed += 1
+        vehicle.draw(screen)
 
-        for vehicle in vehicles[lane][:]:  # Use a copy of the list to avoid modification issues
-            vehicle.fall(vehicles[lane], adjacent_lane_vehicles, safe_threshold, ample_space)  # Ensure safe distance and switching
-            vehicle.draw(screen)
-
-    # Display vehicle passed count
-    font = pygame.font.Font(None, 26)
-    passed_text = font.render(f'Vehicles Passed: {vehicle_passed_count}', True, WHITE)
-    screen.blit(passed_text, (10, 10))
-
+    font = pygame.font.Font(None, 28)
+    text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
+    screen.blit(text, (10, 10))
     pygame.display.flip()
-    pygame.time.delay(30)
+    clock.tick(FPS)
 
 pygame.quit()
-

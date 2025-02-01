@@ -13,7 +13,6 @@ WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 
-
 total_vehicles_passed = 0
 
 class Vehicle:
@@ -24,6 +23,7 @@ class Vehicle:
         self.max_speed = 3 if vehicle_type == "motorcycle" else 2
         self.speed = random.uniform(1, 2) if vehicle_type == "motorcycle" else random.uniform(0.5, 1.5)
         self.original_speed = self.speed  # Keep track of the original speed
+        
 
         # Define size
         if vehicle_type == "motorcycle":
