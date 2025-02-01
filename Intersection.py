@@ -1,60 +1,42 @@
 import pygame
 import sys
-import time
-
 
 pygame.init()
-
 
 # Screen dimensions
 screen_width = 1280
 screen_height = 800
 
-
 # Create the screen
 screen = pygame.display.set_mode((screen_width, screen_height))
-
 
 background_image = pygame.image.load("dedicated_laneIMG.png")
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 
+pygame.display.set_caption("Traffic Light Simulation")
 
-pygame.display.set_caption("Pygame with Background Image")
+# Traffic light coordinates
+dash_coordinates = {
+    "north": [(760, 420), (680, 420)],
+    "south": [(600, 690)],
+    "east": [(880, 590)],
+    "west": [(400, 600)],
+}
 
+# Traffic light color dictionary
+dash_colors = {coord: (255, 0, 0) for coords in dash_coordinates.values() for coord in coords}  # Initially all red
 
-dash_coordinates = [
-    # Traffic lights
-    # north road
-    (760, 420), (680, 420),
-    # East road
-    (880, 590),
-    # South road
-    (600, 690),
-    # West road
-    (400, 520),
+# Traffic light sequence with time intervals
+traffic_cycle = [
+    ("north", 30000),  # North green for 30 seconds
+    ("south", 15000),  # After 15s of north, south also green for 15s
+    ("east", 30000),   # East green for 30s
+    ("west", 15000),   # West green for 15s (updated from 30s)
 ]
 
-dash_length = 20  # Length of the dash
-dash_thickness = 5  # Thickness of the dash
-
-# Initial color for traffic lights
-dash_colors = {coord: (255, 0, 0) for coord in dash_coordinates}  # Red initially
-current_green_index = 0
-
-
-directions = [
-    [(760, 420), (680, 420)],  # North
-    [(600, 690)],  # South
-    [(880, 590)],  # East
-    [(400, 520)],  # West
-]
-
-for coord in directions[current_green_index]:
-    dash_colors[coord] = (0, 255, 0)  # Set the first direction's lights to green
-
-
-color_change_time = 10000  # Time interval in milliseconds
-last_color_change = pygame.time.get_ticks()
+# Timer and index initialization
+current_phase = 0
+phase_start_time = pygame.time.get_ticks()
 
 # Main loop
 running = True
@@ -63,41 +45,47 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-
-    # Get the current time
+    # Get current time
     current_time = pygame.time.get_ticks()
+    elapsed_time = current_time - phase_start_time
 
+    # Get current phase details
+    current_direction, phase_duration = traffic_cycle[current_phase]
 
-    # Change traffic light colors every 5 seconds
-    if current_time - last_color_change >= color_change_time:
-        # Reset all lights to red
-        for coord in dash_colors:
+    # Change phase if duration is over
+    if elapsed_time >= phase_duration:
+        phase_start_time = current_time  # Reset timer
+        current_phase = (current_phase + 1) % len(traffic_cycle)  # Move to next phase
+        current_direction, phase_duration = traffic_cycle[current_phase]  # Update new phase
+
+    # Reset all lights to red
+    for coords in dash_coordinates.values():
+        for coord in coords:
             dash_colors[coord] = (255, 0, 0)
-        # Set the current direction to green
-        current_green_index = (current_green_index + 1) % len(directions)
-        for coord in directions[current_green_index]:
+
+    # Set green lights according to current phase
+    if current_direction == "north":
+        for coord in dash_coordinates["north"]:
+            dash_colors[coord] = (0, 255, 0)  # North green
+        if elapsed_time >= 15000:  # After 15s, turn south green too
+            for coord in dash_coordinates["south"]:
+                dash_colors[coord] = (0, 255, 0)  # South green
+
+    elif current_direction in dash_coordinates:  # East or West green
+        for coord in dash_coordinates[current_direction]:
             dash_colors[coord] = (0, 255, 0)
-        # Update the last color change time
-        last_color_change = current_time
 
-
-
-
-    # Draw the background and traffic lights
+    # Draw background
     screen.blit(background_image, (0, 0))
-   
 
-    for (x, y) in dash_coordinates:
-        if x == 880 or x == 400:  # East and West roads (vertical dashes)
-            pygame.draw.line(screen, dash_colors[(x, y)], (x, y - dash_length // 2), (x, y + dash_length // 2), dash_thickness)
-        else:  # North and South roads (horizontal dashes)
-            pygame.draw.line(screen, dash_colors[(x, y)], (x - dash_length // 2, y), (x + dash_length // 2, y), dash_thickness)
-
+    # Draw traffic lights
+    for (x, y), color in dash_colors.items():
+        if (x, y) in dash_coordinates["east"] or (x, y) in dash_coordinates["west"]:  # Vertical dashes
+            pygame.draw.line(screen, color, (x, y - 10), (x, y + 10), 5)
+        else:  # Horizontal dashes
+            pygame.draw.line(screen, color, (x - 10, y), (x + 10, y), 5)
 
     pygame.display.flip()
 
-
 pygame.quit()
 sys.exit()
-
-

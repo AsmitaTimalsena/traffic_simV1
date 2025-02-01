@@ -318,22 +318,14 @@ while running:
         # Update the last color change time
         last_color_change = current_time
 
-
-
-
     # Draw the background and traffic lights
     screen.blit(background_image, (0, 0))
-
-
-
 
     for (x, y) in dash_coordinates:
         if x == 880 or x == 400:  # East and West roads (vertical dashes)
             pygame.draw.line(screen, dash_colors[(x, y)], (x, y - dash_length // 2), (x, y + dash_length // 2), dash_thickness)
         else:  # North and South roads (horizontal dashes)
             pygame.draw.line(screen, dash_colors[(x, y)], (x - dash_length // 2, y), (x + dash_length // 2, y), dash_thickness)
-
-
 
 
     # Update and draw vehicles
