@@ -29,9 +29,9 @@ dash_colors = {coord: (255, 0, 0) for coords in dash_coordinates.values() for co
 # Traffic light sequence with time intervals
 traffic_cycle = [
     ("north", 30000),  # North green for 30 seconds
-    ("south", 15000),  # After 15s of north, south also green for 15s
+    ("south", 30000),  # South green for 15 seconds
     ("east", 30000),   # East green for 30s
-    ("west", 15000),   # West green for 15s (updated from 30s)
+    ("west", 15000),   # West green for 15s
 ]
 
 # Timer and index initialization
@@ -63,17 +63,38 @@ while running:
         for coord in coords:
             dash_colors[coord] = (255, 0, 0)
 
-    # Set green lights according to current phase
+    # Set green and orange lights according to current phase
     if current_direction == "north":
-        for coord in dash_coordinates["north"]:
-            dash_colors[coord] = (0, 255, 0)  # North green
-        if elapsed_time >= 15000:  # After 15s, turn south green too
+        if elapsed_time < 27000:
+            for coord in dash_coordinates["north"]:
+                dash_colors[coord] = (0, 255, 0)  # North green
+        elif 27000 <= elapsed_time < 29000:
+            for coord in dash_coordinates["north"]:
+                dash_colors[coord] = (255, 165, 0)  # North orange
+
+    if current_phase > 0 and traffic_cycle[current_phase - 1][0] == "north" and elapsed_time >= 0:
+        if elapsed_time < 12000:
             for coord in dash_coordinates["south"]:
                 dash_colors[coord] = (0, 255, 0)  # South green
+        elif 12000 <= elapsed_time < 14000:
+            for coord in dash_coordinates["south"]:
+                dash_colors[coord] = (255, 165, 0)  # South orange
 
-    elif current_direction in dash_coordinates:  # East or West green
-        for coord in dash_coordinates[current_direction]:
-            dash_colors[coord] = (0, 255, 0)
+    elif current_direction == "east":
+        if elapsed_time < 27000:
+            for coord in dash_coordinates["east"]:
+                dash_colors[coord] = (0, 255, 0)  # East green
+        elif 27000 <= elapsed_time < 29000:
+            for coord in dash_coordinates["east"]:
+                dash_colors[coord] = (255, 165, 0)  # East orange
+
+    elif current_direction == "west":
+        if elapsed_time < 12000:
+            for coord in dash_coordinates["west"]:
+                dash_colors[coord] = (0, 255, 0)  # West green
+        elif 12000 <= elapsed_time < 14000:
+            for coord in dash_coordinates["west"]:
+                dash_colors[coord] = (255, 165, 0)  # West orange
 
     # Draw background
     screen.blit(background_image, (0, 0))
