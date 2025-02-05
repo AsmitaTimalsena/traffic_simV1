@@ -1,6 +1,7 @@
 
 import pygame
 import random
+import time
 
 pygame.init()
 
@@ -155,6 +156,25 @@ timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_posit
 for timer in timers.values():
     pygame.time.set_timer(timer, 1000)
 
+last_print_time = time.time()
+def calculate_average_speeds():
+    # Calculate car average (combining both car lanes)
+    car_speeds = []
+    for lane in car_positions:
+        if car_velocity_data[lane]['display_speed'] > 0:
+            car_speeds.append(car_velocity_data[lane]['display_speed'] * scaling_factor)
+    car_avg = sum(car_speeds) / len(car_speeds) if car_speeds else 0
+
+    # Calculate motorcycle average (combining both motorcycle lanes)
+    bike_speeds = []
+    for lane in motorcycle_positions:
+        if motorcycle_velocity_data[lane]['display_speed'] > 0:
+            bike_speeds.append(motorcycle_velocity_data[lane]['display_speed'] * scaling_factor)
+    bike_avg = sum(bike_speeds) / len(bike_speeds) if bike_speeds else 0
+
+    return car_avg, bike_avg
+
+
 # Main loop
 running = True
 clock = pygame.time.Clock()
@@ -251,7 +271,14 @@ while running:
         text = font.render(f"Motorcycle Avg Speed (Lane {lane}): {scaled_speed:.2f} km/hr", True, WHITE)
         screen.blit(text, (400, y_offset))
         y_offset += 30
-
+    
+    current_time = time.time()
+    if current_time - last_print_time >= 1.0:  # Print every second
+        car_avg, bike_avg = calculate_average_speeds()
+        minutes = elapsed_minutes
+        seconds = elapsed_seconds
+        print(f"Time {minutes:02d}:{seconds:02d} - Car Avg Speed: {car_avg:.2f} km/hr, Bike Avg Speed: {bike_avg:.2f} km/hr")
+        last_print_time = current_time
 
     pygame.display.flip()
 
