@@ -52,7 +52,7 @@ def normalize_speed(speed, vehicle_type):
         return max(MOTORCYCLE_MIN_SPEED, min(MOTORCYCLE_MAX_SPEED, speed))
     else:
         return max(CAR_MIN_SPEED, min(CAR_MAX_SPEED, speed))
-
+start_time=pygame.time.get_ticks()
 
 class Vehicle:
     def __init__(self, vehicle_type, lane_position):
@@ -219,27 +219,35 @@ while running:
                     motorcycle_velocity_data[lane]["display_speed"] = speeds_sum / vehicle_count
                     motorcycle_velocity_data[lane]["update_time"] = current_time
 
-    # Display information
+   # Calculate elapsed time
+    elapsed_time = pygame.time.get_ticks() - start_time  # in milliseconds
+    elapsed_seconds = elapsed_time // 1000  #  seconds
+    elapsed_minutes = elapsed_seconds // 60  #  minutes
+    elapsed_seconds %= 60  # Remaining seconds
+   
+
+    #metrics display
     font = pygame.font.Font(None, 24)
-    y_offset = 50
+    y_offset = 150
     text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)
     screen.blit(text, (450, y_offset))
+    timer_text = font.render(f"Time: {elapsed_minutes:02}:{elapsed_seconds:02}",True, WHITE)
+    screen.blit(timer_text, (400, y_offset+150))
 
-        # Scaling factor to adjust the displayed speed
-    SCALING_FACTOR = 6.9  # Adjust this value if needed
+    scaling_factor = 6.9  # Adjust this value if needed
 
     # Display average speeds
     y_offset += 30
     for lane in car_positions:
         # Apply the scaling factor to the display speed
-        scaled_speed = car_velocity_data[lane]['display_speed'] * SCALING_FACTOR
+        scaled_speed = car_velocity_data[lane]['display_speed'] * scaling_factor
         text = font.render(f"Car Avg Speed (Lane {lane}): {scaled_speed:.2f} km/hr", True, WHITE)
         screen.blit(text, (400, y_offset))
         y_offset += 30
 
     for lane in motorcycle_positions:
         # Apply the scaling factor to the display speed
-        scaled_speed = motorcycle_velocity_data[lane]['display_speed'] * SCALING_FACTOR
+        scaled_speed = motorcycle_velocity_data[lane]['display_speed'] * scaling_factor
         text = font.render(f"Motorcycle Avg Speed (Lane {lane}): {scaled_speed:.2f} km/hr", True, WHITE)
         screen.blit(text, (400, y_offset))
         y_offset += 30
