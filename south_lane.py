@@ -22,7 +22,7 @@ background_image = pygame.transform.scale(background_image, (screen_width, scree
 
 # Global variables
 total_vehicles_passed = 0
-motorcycle_positions = [ 520, 600]  # Lanes for motorcycles
+motorcycle_positions = [520, 600]  # Lanes for motorcycles
 car_positions = [520, 600]        # Lanes for cars
 motorcycle_safe_threshold = 50  # Safe distance for motorcycles
 car_safe_threshold = 180  # Increased safe distance for cars
@@ -83,6 +83,12 @@ class Vehicle:
         self.has_crossed_light = False  # Tracks if the vehicle has crossed the traffic light
         self.has_been_counted = False  # Initialize counting flag
 
+        # New properties for smooth lane change
+        self.is_changing_lane = False
+        self.target_x = None
+        self.target_y = None
+        self.original_speed = 1.5  # Speed for lane-changing movement
+
         # Vehicle size
         if vehicle_type == "motorcycle":
             self.width = random.randint(8, 12)  # Narrower width for a sleek look
@@ -96,7 +102,9 @@ class Vehicle:
 
         # Traffic light logic for lanes 600 and 520
         if self.x in (600, 520):  # Only apply to lanes 600 and 520
-            light_color = dash_colors.get((self.x, 690), (255, 0, 0))  # Default to red if no light is found
+            light_color = dash_colors.get((self.x, 690), (0, 255, 0))  # Default to red if no light is found
+            east_light_color = dash_colors.get((880, 590), (255, 0, 0))  # East traffic light color
+            west_light_color = dash_colors.get((400, 600), (255, 0, 0))  # West traffic light color
             light_stop_y = 700  # 20 units before the traffic dash line
 
             distance_to_light = self.y - light_stop_y
@@ -138,6 +146,33 @@ class Vehicle:
                     self.y -= self.speed  # Update position based on speed
                     return  # Skip further logic for these lanes when stopping for the light
 
+        # Logic for vehicles reaching (520, 590)
+        if self.y <= 590 and self.x == 520:
+            if self.vehicle_type == "motorcycle":
+                # Motorcycle continues to move forward
+                self.y -= self.speed
+            elif self.vehicle_type == "car":
+                # Car moves to (590, 530) and continues straight
+                if not self.is_changing_lane:
+                    self.is_changing_lane = True
+                    self.target_x = 590
+                    self.target_y = 530
+
+        # Smooth lane change logic
+        if self.is_changing_lane:
+            if self.x < self.target_x:
+                self.x += self.original_speed
+            elif self.x > self.target_x:
+                self.x -= self.original_speed
+
+            if self.y > self.target_y:
+                self.y -= self.speed
+
+            if abs(self.x - self.target_x) < self.original_speed and abs(self.y - self.target_y) < self.speed:
+                self.x = self.target_x
+                self.y = self.target_y
+                self.is_changing_lane = False
+
         # Normal movement logic for vehicles moving straight
         closest_vehicle = None
         closest_distance = float('inf')
@@ -154,14 +189,13 @@ class Vehicle:
         if closest_vehicle:
             if closest_distance < safe_threshold:
                 self.speed = max(closest_vehicle.speed - 0.5, 0)  # Slow down to avoid collision
-            elif closest_distance > 70:
-                self.speed = min(self.max_speed, self.original_speed + 0.5)  # Speed up
             else:
                 self.speed = self.original_speed  # Maintain original speed
         else:
-            self.speed = self.max_speed  # No vehicle ahead, move at max speed
+            self.speed = self.original_speed  # No vehicle ahead, move at original speed
 
-        self.y -= self.speed
+        if not self.is_changing_lane:
+            self.y -= self.speed
 
         # If off-screen, reset position and count as passed
         if self.y < -50:
@@ -176,6 +210,9 @@ class Vehicle:
         self.is_turning = False
         self.has_crossed_light = False
         self.has_been_counted = False  # Reset counting flag
+        self.is_changing_lane = False
+        self.target_x = None
+        self.target_y = None
 
     def draw(self, surface):
         vehicle_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -207,7 +244,7 @@ while running:
             if event.type == timer:
                 # Generate vehicle type based on probability
                 vehicle_type = random.choices(
-                    ["motorcycle", "car"], [0.65, 0.35], k=1
+                    ["motorcycle", "car"], [0.7, 0.3], k=1
                 )[0]
 
                 # Set the safe threshold based on vehicle type

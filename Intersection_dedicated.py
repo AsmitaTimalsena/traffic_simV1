@@ -25,7 +25,7 @@ motorcycle_positions = [760, 795]
 car_positions = [680, 850]     
 motorcycle_safe_threshold = 50  
 car_safe_threshold = 180  
-max_vehicles_per_lane = 10 
+max_vehicles_per_lane = 20 
 
 dash_coordinates = [
     # Traffic lights
@@ -311,11 +311,7 @@ while running:
             vehicle.move(lane_vehicles, car_safe_threshold if lane in car_positions else motorcycle_safe_threshold)
             vehicle.draw(screen)
 
-    # Display the total number of vehicles passed
-    font = pygame.font.Font(None, 24)
-    text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
-    screen.blit(text, (10, 10))
-
+    
     pygame.display.flip()
     pygame.time.Clock().tick(60)  # Adjust frame rate for smoother simulation
 

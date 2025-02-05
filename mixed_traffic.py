@@ -3,7 +3,7 @@ import random
 
 pygame.init()
 
-width, height = 300, 700
+width, height = 800, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Shared lanes vehicle simulation')
 
@@ -15,7 +15,7 @@ GREEN = (0, 255, 0)
 
 # Speed conversion (1 pixel = 5 meters, 60 FPS)
 FPS = 60
-METERS_PER_PIXEL = 5  # Adjusted scale
+METERS_PER_PIXEL = 5
 
 # Vehicle settings
 lanes = [45, 120, 180, 240]
@@ -28,6 +28,11 @@ total_vehicles_passed = 0
 
 # Font for rendering the text
 font = pygame.font.Font(None, 24)
+# Real-world and simulation constants
+REAL_WORLD_HEIGHT = 200  # Real-world height in meters
+SCREEN_HEIGHT = 700  # Screen height in pixels
+
+distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
 
 class Vehicle:
     # Class-level constants for speed ranges
@@ -170,6 +175,9 @@ while running:
     for y in range(start_y, height, dash_length + gap_length):
         pygame.draw.line(screen, WHITE, (start_x, y), (start_x, y + dash_length), 2)
 
+    pygame.draw.line(screen, WHITE, (300, 0), (300, height), 5)
+    pygame.draw.line(screen, WHITE, (310, 0), (310, height), 5)
+
     # Update and draw vehicles
     for vehicle in vehicles:
         vehicle.adjust_speed(vehicles)  # Adjust speed based on proximity
@@ -180,9 +188,11 @@ while running:
             total_vehicles_passed += 1  # Increase the counter when the vehicle passes the screen
         vehicle.draw(screen)
 
-    font = pygame.font.Font(None, 28)
-    text = font.render(f"Vehicles Passed: {total_vehicles_passed}", True, WHITE)
-    screen.blit(text, (10, 10))
+    # Display total vehicles passed
+    font = pygame.font.Font(None, 24)
+    y_offset = 50
+    text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)
+    screen.blit(text, (450, y_offset))
 
     pygame.display.flip()
     clock.tick(FPS)  # Maintain 60 FPS
