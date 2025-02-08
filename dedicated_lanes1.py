@@ -7,7 +7,7 @@ pygame.init()
 
 width, height = 800, 700
 screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption('Shared lanes vehicle simulation')
+pygame.display.set_caption('Dedicated lanes vehicle simulation')
 # Real-world and simulation constants
 REAL_WORLD_HEIGHT = 200  # Real-world height in meters
 SCREEN_HEIGHT = 700  # Screen height in pixels
