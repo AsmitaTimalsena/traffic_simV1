@@ -173,6 +173,26 @@ class Vehicle:
                 self.y = self.target_y
                 self.is_changing_lane = False
 
+        # Logic for vehicles reaching (600, 540) and turning east
+        if self.x == 600 and self.y <= 540 and not self.is_turning:
+            if light_color == (0, 255, 0):  # Green light
+                self.is_turning = True
+                self.angle = -90  # Rotate 90 degrees to face east
+
+        # Smooth turning logic
+        if self.is_turning:
+            if self.angle < -90:  # Ensure the angle doesn't exceed -90 degrees
+                self.angle = -90
+            else:
+                self.angle -= 2  # Gradually rotate the vehicle
+
+            # Move the vehicle east after turning
+            if self.angle == -90:
+                self.x += self.speed
+                self.y = 540  
+                return 
+        
+        
         # Normal movement logic for vehicles moving straight
         closest_vehicle = None
         closest_distance = float('inf')
@@ -194,11 +214,12 @@ class Vehicle:
         else:
             self.speed = self.original_speed  # No vehicle ahead, move at original speed
 
-        if not self.is_changing_lane:
+        # Update position for vehicles moving straight
+        if not self.is_changing_lane and not self.is_turning:
             self.y -= self.speed
 
         # If off-screen, reset position and count as passed
-        if self.y < -50:
+        if self.y < -50 or self.x > screen_width + 50:
             if not self.has_been_counted:
                 total_vehicles_passed += 1
                 self.has_been_counted = True

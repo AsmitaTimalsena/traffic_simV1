@@ -53,6 +53,9 @@ directions = [
     [(400, 600)],  # West
 ]
 
+# (800,0),(850,0),
+#     (760,0), (680,0),
+
 for coord in directions[current_green_index]:
     dash_colors[coord] = (0, 255, 0)  # Set the first direction's lights to green
 
