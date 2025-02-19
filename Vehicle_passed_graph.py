@@ -1,17 +1,17 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Data
+
 simulation_number = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 dedicated_lane_counts = [77, 91, 83, 89, 83, 79, 69, 60, 76, 72]
 shared_lane_counts = [56, 59, 57, 65, 62, 64, 60, 66, 62, 58]
 
-# Bar width and positions
+
 bar_width = 0.35
 r1 = np.arange(len(simulation_number))
 r2 = [x + bar_width for x in r1]
 
-# Plotting
+
 plt.figure(figsize=(10, 6))
 plt.bar(r1, dedicated_lane_counts, width=bar_width, color='skyblue', label='Dedicated Lanes')
 plt.bar(r2, shared_lane_counts, width=bar_width, color='lightgreen', label='Shared Lanes')
@@ -23,7 +23,6 @@ plt.title('Comparison of Vehicles Passed in Dedicated vs Shared Lanes')
 plt.xticks([r + bar_width / 2 for r in range(len(simulation_number))], simulation_number)
 plt.legend()
 
-# Display the graph
 plt.show()
 
 #THe simulation data is as follows:

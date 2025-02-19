@@ -177,17 +177,17 @@ lanes_data = [
     {
         "name": "North-Lane-4",
         "spawn": (680, 0),
-        "vehicle_types": ["car", "bike"],
+        "vehicle_types": ["car"],
         "travel_dir": "S",
         "stop_for_red": True,
         # Maybe they can only go straight. (Adjust if you like.)
         "possible_paths": [
             [],
-            [{
-                "trigger_point": (680, 610),
-                "action": "turn_right",  # S->E
-                "new_direction": "W"
-            }]
+            # [{
+            #     "trigger_point": (680, 610),
+            #     "action": "turn_right",  # S->E
+            #     "new_direction": "W"
+            # }]
         ]
     },
 
@@ -226,35 +226,37 @@ lanes_data = [
         ]
     },
 
-    # -------------------------------------------------------
+        # -------------------------------------------------------
     # EAST LANE (travel_dir = "W")
     # -------------------------------------------------------
     {
         "name": "East-NoStop",
-        "spawn": (1280, 590),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "W",
-        "stop_for_red": True,
-        "possible_paths": [
-            [{
-                "trigger_point": (750, 660),
-                "action": "turn_left",  # W->S
-                "new_direction": "S"
-            }]
-        ]
-    },
-    {
-        "name": "East-StopThenBranch",
         "spawn": (1280, 650),
         "vehicle_types": ["car", "bike"],
         "travel_dir": "W",
         "stop_for_red": False,
         "possible_paths": [
             [{
-                "trigger_point": (600, 590),
+                "trigger_point": (770, 650),
+                "action": "turn_left",  # W->S
+                "new_direction": "S"
+            }],
+           
+        ]
+    },
+    {
+        "name": "East-StopThenBranch",
+        "spawn": (1280, 590),
+        "vehicle_types": ["car", "bike"],
+        "travel_dir": "W",
+        "stop_for_red": True,
+        "possible_paths": [
+            [{
+                "trigger_point": (600,590),
                 "action": "branch_east",
                 "new_direction": "N"
-            }]
+            }],
+            # []  # straight
         ]
     },
 
@@ -262,23 +264,46 @@ lanes_data = [
     # WEST LANE (travel_dir = "E")
     # -------------------------------------------------------
     {
+    "name": "West-LeftTurn",
+    "spawn": (0, 520),
+    "vehicle_types": ["car", "bike"],
+    "travel_dir": "E",
+    "stop_for_red": False,  # Vehicles won't stop for red traffic light
+    "possible_paths": [
+        [{
+            "trigger_point": (440, 520),
+            "action": "turn_left",  # Turn left to move north
+            "new_direction": "N"
+        }]
+    ]
+    },
+    {
         "name": "West-StopThenMultiTurn",
-        "spawn": (0, 530),
+        "spawn": (0, 620),
         "vehicle_types": ["car", "bike"],
         "travel_dir": "E",
         "stop_for_red": True,
         "possible_paths": [
-            [{
-                "trigger_point": (680, 530),
-                "action": "turn_right",  # E->S
-                "new_direction": "S"
-            },
-            {
-                "trigger_point": (480, 530),
-                "action": "turn_left",   # E->N
-                "new_direction": "N"
-            }],
-            []  # straight
+            [
+                {
+                    "trigger_point": (680, 620),
+                    "action": "turn_right",  # E->S
+                    "new_direction": "S"
+                }
+            ],
+            # [
+            #     {
+            #         "trigger_point": (680, 620),
+            #         "action": "move_up",  # Move up to (680, 550)
+            #         "new_direction": "E"
+            #     },
+            #     {
+            #         "trigger_point": (680, 530),
+            #         "action": "turn_left",  # E->N
+            #         "new_direction": "N"
+            #     }
+            # ],
+        
         ]
     }
 ]
@@ -372,11 +397,11 @@ class Vehicle:
         if vehicle_type == "bike":
             self.width = 10
             self.height = 25
-            self.max_speed = 4.0
+            self.max_speed = 3.0
         else:
             self.width = 20
             self.height = 40
-            self.max_speed = 3.0
+            self.max_speed = 2.0
 
         self.speed = random.uniform(self.max_speed * 0.8, self.max_speed)
         self.angle = angle_for_dir(self.direction)
@@ -425,6 +450,20 @@ class Vehicle:
         global total_vehicles_passed
         global dedicated_passed_south, shared_passed_south
 
+        # Add special logic for south directional lane (520, 790)
+    # if self.lane_def["name"] == "South-Branching-Lane":
+    #     # Initialize the variables before using them
+    #     east_light_color = get_light_color_for_direction("E")
+    #     west_light_color = get_light_color_for_direction("W")
+        
+    #     east_has_red = (east_light_color == RED)
+    #     west_has_green = (west_light_color == GREEN)
+        
+        # # If either condition is true, stop the vehicle
+        # if not east_has_red or west_has_green:
+        #     self.speed = 0
+        #     return False  # Don't remove the vehicle
+
         # 1) Handle red/stop line if needed
         if self.stop_for_red:
             # figure out the stop line
@@ -451,6 +490,8 @@ class Vehicle:
         else:
             # This lane ignores red
             self.speed = min(self.speed + 0.2, self.max_speed)
+
+        
 
         # 2) Keep safe distance from vehicle ahead in the same lane
         safe_threshold = motorcycle_safe_threshold if self.vehicle_type == "bike" else car_safe_threshold
@@ -529,6 +570,8 @@ class Vehicle:
                 self.turn_left(instr["new_direction"])
             elif action == "turn_right":
                 self.turn_right(instr["new_direction"])
+            elif action == "move_up":
+                self.move_up(instr["new_direction"])
             elif action == "branch":
                 self.branch(instr["new_direction"])
             elif action == "branch_east":
@@ -536,6 +579,15 @@ class Vehicle:
             # You can add "branch" or other actions here if needed.
             self.turn_index += 1
 
+    def move_up(self, new_dir):
+        """
+        Move the vehicle up to (680, 550) before turning left.
+        """
+        if self.y > 550:
+            self.y -= self.speed  # Move up
+        else:
+            # Once the vehicle reaches (680, 550), turn left
+            self.turn_left(new_dir)
 
     def branch(self, new_dir):
         instr = self.turn_instructions[self.turn_index]
@@ -562,8 +614,6 @@ class Vehicle:
         # Rotate and move north
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
-
-    
 
     def turn_left(self, new_dir):
         instr = self.turn_instructions[self.turn_index]
@@ -668,10 +718,10 @@ while running:
 
     # Show which direction is active
     font = pygame.font.SysFont(None, 24)
-    active_dir = direction_order[direction_index]
-    info_txt = f"Active: {active_dir} [{light_state.upper()}]"
-    info_surf = font.render(info_txt, True, (255, 255, 255))
-    screen.blit(info_surf, (20, 20))
+    # active_dir = direction_order[direction_index]
+    # info_txt = f"Active: {active_dir} [{light_state.upper()}]"
+    # info_surf = font.render(info_txt, True, (255, 255, 255))
+    # screen.blit(info_surf, (20, 20))
 
     # 6) Update & draw vehicles
     to_remove = []
@@ -689,7 +739,7 @@ while running:
         lane_vehicles_map[remv.lane_def["name"]].remove(remv)
 
     # 7) Show total passed
-    txt = font.render(f"Total passed: {total_vehicles_passed}", True, (255,255,255))
+    txt = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, (255,255,255))
     screen.blit(txt, (20, 50))
 
     # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)

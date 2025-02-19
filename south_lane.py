@@ -76,7 +76,7 @@ class Vehicle:
         self.x = lane_position
         self.y = screen_height if lane_position in [600, 520, 400] else random.randint(-screen_height, 0)  # Start off-screen
         self.max_speed = 4 if vehicle_type == "motorcycle" else 3
-        self.speed = random.uniform(2.5, 4.0) if vehicle_type == "motorcycle" else random.uniform(1.5, 3.0)
+        self.speed = random.uniform(3, 4.0) if vehicle_type == "motorcycle" else random.uniform(2, 3.0)
         self.original_speed = self.speed
         self.is_turning = False  # Tracks if the vehicle is turning
         self.angle = 0  # Initial angle (facing south)

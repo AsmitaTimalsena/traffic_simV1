@@ -7,30 +7,28 @@ width, height = 700, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Shared lanes vehicle simulation')
 
-# Colors
+
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 
-# Speed conversion (1 pixel = 5 meters, 60 FPS)
+# Speed conversion, here we used logic(1 pixel = 5 meters, 60 FPS)
 FPS = 60
 METERS_PER_PIXEL = 5
 
 # Vehicle settings
 lanes = [45, 120, 180, 240]
 SEPARATION_DISTANCE = 70
-LANE_CHANGE_DISTANCE = 50  # Reduced distance to make lane changes more frequent
-OVERTAKE_DISTANCE = 50  # How close a vehicle needs to be to start slowing down
+LANE_CHANGE_DISTANCE = 50 
+OVERTAKE_DISTANCE = 50 
 
-# Initialize total vehicles passed counter
 total_vehicles_passed = 0
 
-# Font for rendering the text
 font = pygame.font.Font(None, 24)
-# Real-world and simulation constants
-REAL_WORLD_HEIGHT = 200  # Real-world height in meters
-SCREEN_HEIGHT = 700  # Screen height in pixels
+
+REAL_WORLD_HEIGHT = 200  # real world height in meters
+SCREEN_HEIGHT = 700  
 
 distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
 
@@ -40,12 +38,12 @@ car_speed_data = {"display_speed": 0, "update_time": 0}
 
 # Speed update interval (milliseconds)
 SPEED_UPDATE_INTERVAL = 1000  # 1 second
-# For timer
+
 start_time = pygame.time.get_ticks() 
 class Vehicle:
-    # Class-level constants for speed ranges
-    BIKE_SPEED_RANGE = (35, 42)  # km/h
-    CAR_SPEED_RANGE = (30, 38)   # km/h
+   
+    BIKE_SPEED_RANGE = (35, 42)  
+    CAR_SPEED_RANGE = (30, 38) 
 
     def __init__(self, x, y, lane, vtype):
         self.x = x
@@ -53,28 +51,26 @@ class Vehicle:
         self.lane = lane
         self.vtype = vtype
 
-        # Randomize speed within a specific range for each vehicle type
         if vtype == "bike":
             self.speed = random.randint(*self.BIKE_SPEED_RANGE)  # Random speed for bikes (in km/h)
         elif vtype == "car":
             self.speed = random.randint(*self.CAR_SPEED_RANGE)  # Random speed for cars (in km/h)
 
-        # Convert speed from km/h to pixels per frame
+        #convert speed from km/h to pixels per frame
         self.speed = (self.speed * 1000) / (60 * 60 * METERS_PER_PIXEL)
         
-        # Randomize vehicle size
         if vtype == "car":
-            self.width = random.randint(15, 18)  # Random width for cars
-            self.height = random.randint(25, 28)  # Random height for cars
+            self.width = random.randint(15, 18)  
+            self.height = random.randint(25, 28)  
         elif vtype == "bike":
-            self.width = random.randint(10, 12)  # Random width for bikes
-            self.height = random.randint(20, 25)  # Random height for bikes
+            self.width = random.randint(10, 12)  
+            self.height = random.randint(20, 25)  
         
         self.target_lane = self.lane
-        self.lane_change_progress = 0  # 0 means not yet in the target lane
+        self.lane_change_progress = 0  
         self.change_direction_progress = 0  # How far the vehicle has moved to its target lane
-        self.lane_change_speed_factor = 0.5  # Factor to reduce speed during lane change
-        self.original_speed = self.speed  # Store the original speed
+        self.lane_change_speed_factor = 0.5  # factor to reduce speed during lane change
+        self.original_speed = self.speed  
 
     def draw(self, screen):
         if self.vtype == "car":
@@ -84,25 +80,24 @@ class Vehicle:
 
     def move(self):
         global total_vehicles_passed
-        if self.lane_change_progress < 1:
-            # Reduce speed during lane change
+        if self.lane_change_progress < 1: #reduce speed during lane change
             self.speed = self.original_speed * self.lane_change_speed_factor
-            # Smoothly move to the target lane along y-axis, and then adjust the x-coordinate
+
             self.y += self.speed
-            if abs(self.x - self.target_lane) > 1:
-                # Adjust the x-coordinate to the target lane gradually
+            if abs(self.x - self.target_lane) > 1: #if chainging lane
+               
                 self.x += (self.target_lane - self.x) * 0.1
             else:
                 self.x = self.target_lane
                 self.lane = self.target_lane
                 self.lane_change_progress = 1
-                # Restore original speed after lane change is complete
+                # original speed after lane change
                 self.speed = self.original_speed
         else:
             self.y += self.speed
 
     def adjust_speed(self, vehicles):
-        # Adjust speed if another vehicle is too close
+       
         for other in vehicles:
             if other != self and other.lane == self.lane:
                 distance = other.y - self.y
@@ -186,7 +181,6 @@ while running:
     pygame.draw.line(screen, WHITE, (300, 0), (300, height), 5)
     pygame.draw.line(screen, WHITE, (310, 0), (310, height), 5)
 
-    # Update and draw vehicles
     bike_speeds = []
     car_speeds = []
     for vehicle in vehicles:
@@ -204,7 +198,7 @@ while running:
         elif vehicle.vtype == "car":
             car_speeds.append(vehicle.speed * (60 * 60 * METERS_PER_PIXEL) / 1000)  # Convert back to km/h
 
-    # Update speed data every SPEED_UPDATE_INTERVAL milliseconds
+
     current_time = pygame.time.get_ticks()
     if current_time - bike_speed_data["update_time"] >= SPEED_UPDATE_INTERVAL:
         if bike_speeds:
@@ -218,21 +212,21 @@ while running:
             print(f"[Time: {elapsed_minutes:02}:{elapsed_seconds:02}] Car Avg Speed: {car_speed_data['display_speed']:.2f} km/hr")
         car_speed_data["update_time"] = current_time
 
-    # Calculate elapsed time
+    #  elapsed time calculation
     elapsed_time = pygame.time.get_ticks() - start_time  # in milliseconds
     elapsed_seconds = elapsed_time // 1000  #  seconds
     elapsed_minutes = elapsed_seconds // 60  #  minutes
-    elapsed_seconds %= 60  # Remaining seconds
+    elapsed_seconds %= 60  # remaining seconds
    
 
-    # Display total vehicles passed
+    # Display the metrics
     font = pygame.font.Font(None, 24)
     y_offset = 150
     text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)
     screen.blit(text, (400, y_offset))
     timer_text = font.render(f"Time: {elapsed_minutes:02}:{elapsed_seconds:02}", True, WHITE)
     screen.blit(timer_text, (400, y_offset + 100))
-    # average speeds
+   
     y_offset += 30
     text = font.render(f"Bike Avg Speed: {bike_speed_data['display_speed']:.2f} km/hr", True, WHITE)
     screen.blit(text, (400, y_offset))

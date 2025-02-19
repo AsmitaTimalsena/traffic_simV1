@@ -7,29 +7,27 @@ width, height = 300, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Shared lanes vehicle simulation')
 
-# Colors
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
 
-# Speed conversion (1 pixel = 5 meters, 60 FPS)
+# Speed conversion , here we used logic(1 pixel = 5 meters, 60 FPS)
 FPS = 60
-METERS_PER_PIXEL = 5  # Adjusted scale
+METERS_PER_PIXEL = 5  
 
-# Vehicle speed ranges in km/h
-BIKE_SPEED_KMH = random.randint(35, 40)  # km/h
-CAR_SPEED_KMH = random.randint(30, 35)   # km/h
+#speed ranges in km/h
+BIKE_SPEED_KMH = random.randint(35, 40)  
+CAR_SPEED_KMH = random.randint(30, 35)   
 
 BIKE_SPEED_PIXELS = (BIKE_SPEED_KMH * 1000) / (60 * 60 * METERS_PER_PIXEL)
 CAR_SPEED_PIXELS = (CAR_SPEED_KMH * 1000) / (60 * 60 * METERS_PER_PIXEL)
 
-# Vehicle settings
 lanes = [45, 120, 180, 240]
 SEPARATION_DISTANCE = 70
 LANE_CHANGE_DISTANCE = 120
 OVERTAKE_DISTANCE = 50  
 
-# Initialize total vehicles passed counter
+
 total_vehicles_passed = 0
 
 class Vehicle:
