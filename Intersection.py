@@ -36,7 +36,7 @@ dedicated_lanes = {"North-Car-Outer", "North-Bike-Middle"}
 
 motorcycle_safe_threshold = 50
 car_safe_threshold = 180
-max_vehicles_per_lane = 15  # Just an example
+max_vehicles_per_lane = 15  
 
 #############################################################################
 # TRAFFIC LIGHT DATA
@@ -80,11 +80,11 @@ light_state = "green"
 light_state_start = pygame.time.get_ticks()
 
 light_durations = {
-    "green": 13000,   # 7 seconds
-    "orange": 2000,  # 2 seconds
-    "allred": 1000,  # 1 seconds of all-red
-    "green_west": 6000,  # 6 seconds for green (West)
-    "orange_west": 2000 
+    "green": 13000,       
+    "orange": 2000,     
+    "allred": 1000,       
+    "green_west": 6000,   
+    "orange_west": 2000   
 }
 
 def get_light_color_for_direction(dir_name):
@@ -93,7 +93,10 @@ def get_light_color_for_direction(dir_name):
         return RED
     active_direction = direction_order[direction_index]
     if dir_name == active_direction:
-        return GREEN if light_state == "green" else ORANGE
+        if dir_name == "W":
+            return GREEN if light_state == "green_west" else ORANGE
+        else:
+            return GREEN if light_state == "green" else ORANGE
     else:
         return RED
 
@@ -109,7 +112,6 @@ def is_direction_green(dir_name):
             return light_state in ["green", "orange"]
     else:
         return False
-
 #############################################################################
 # LANE DEFINITIONS
 #############################################################################
@@ -288,26 +290,26 @@ lanes_data = [
     },
     {
         "name": "West-StopThenMultiTurn",
-        "spawn": (0, 620),
+        "spawn": (0, 600),
         "vehicle_types": ["car", "bike"],
         "travel_dir": "E",
         "stop_for_red": True,
         "possible_paths": [
             [
                 {
-                    "trigger_point": (680, 620),
+                    "trigger_point": (680, 600),
                     "action": "turn_right",  # E->S
                     "new_direction": "S"
                 }
             ],
             # [
             #     {
-            #         "trigger_point": (680, 620),
-            #         "action": "move_up",  # Move up to (680, 550)
+            #         "trigger_point": (700, 600),
+            #         "action": "move_east", 
             #         "new_direction": "E"
             #     },
             #     {
-            #         "trigger_point": (680, 530),
+            #         "trigger_point": (720, 530),
             #         "action": "turn_left",  # E->N
             #         "new_direction": "N"
             #     }
@@ -458,22 +460,33 @@ class Vehicle:
     def move_and_collide(self, lane_vehicles, all_vehicles):
         global total_vehicles_passed
         global dedicated_passed_south, shared_passed_south
+       
+        # Special logic for south directional lane (520, 790)
+        if self.lane_def["name"] == "South-Branching-Lane":
+            # Get west direction traffic light status
+            west_light_color = get_light_color_for_direction("E")
+            
+            # If west has green or orange (is_direction_green includes both states)
+            if is_direction_green("E"):
+                # Calculate distance to stopping point (520, 640)
+                dist_to_stop = math.hypot(self.x - 520, self.y - 690)
+                
+                # If we're approaching the stop point, gradually slow down
+                if dist_to_stop < 50 and self.y < 690:
+                    self.speed = max(self.speed - 0.4, 0)
+                    return False  # Don't remove the vehicle
+                  # If we're exactly at y=690, stop completely
+                elif abs(self.y - 690) < 1:  # Using small threshold for floating point comparison
+                    self.speed = 0
+                    self.y = 690  # Ensure exact positioning
+                    return False  # Don't remove the vehicle
+                # If we're past y=690, continue moving normally
+                elif self.y > 690:
+                    self.speed = min(self.speed + 0.2, self.max_speed)
+            else:
+                # If west has green/orange, resume normal speed
+                self.speed = min(self.speed + 0.2, self.max_speed)
 
-        # Add special logic for south directional lane (520, 790)
-    # if self.lane_def["name"] == "South-Branching-Lane":
-    #     # Initialize the variables before using them
-    #     east_light_color = get_light_color_for_direction("E")
-    #     west_light_color = get_light_color_for_direction("W")
-        
-    #     east_has_red = (east_light_color == RED)
-    #     west_has_green = (west_light_color == GREEN)
-        
-        # # If either condition is true, stop the vehicle
-        # if not east_has_red or west_has_green:
-        #     self.speed = 0
-        #     return False  # Don't remove the vehicle
-        # Ensure vehicles from (520,790) stop at (520,640) if west lane is green
-        
 
         # 1) Handle red/stop line if needed
         if self.stop_for_red:
@@ -501,9 +514,6 @@ class Vehicle:
         else:
             # This lane ignores red
             self.speed = min(self.speed + 0.2, self.max_speed)
-
-
-        
 
         # 2) Keep safe distance from vehicle ahead in the same lane
         safe_threshold = motorcycle_safe_threshold if self.vehicle_type == "bike" else car_safe_threshold
@@ -588,8 +598,33 @@ class Vehicle:
                 self.branch(instr["new_direction"])
             elif action == "branch_east":
                 self.branch_east(instr["new_direction"])
+            elif action == "move_east":
+                self.move_east(instr["new_direction"])
+            elif action == "turn_straight_east":
+                self.turn_straight_east(instr["new_direction"])
             # You can add "branch" or other actions here if needed.
             self.turn_index += 1
+    def move_east(self, new_dir):
+        """
+        Move the vehicle east to (700, 600).
+        """
+        if self.x < 700:
+            self.x += self.speed  # Move east
+        else:
+            # Once the vehicle reaches (700, 600), continue to the next instruction
+            pass
+
+    def turn_straight_east(self, new_dir):
+        """
+        Move the vehicle straight east to (720, 530).
+        """
+        if self.y > 530:
+            self.y -= self.speed  # Move up
+        else:
+            # Once the vehicle reaches (720, 530), continue east
+            self.direction = new_dir
+            self.angle = angle_for_dir(new_dir)
+
 
     def move_up(self, new_dir):
         """
@@ -699,7 +734,7 @@ while running:
         elif light_state == "orange":
             light_state = "allred"
         elif light_state == "allred":
-            # Was allred => move to next direction’s green
+            # Was allred => move to next direction's green
             direction_index = (direction_index + 1) % len(direction_order)
             if direction_order[direction_index] == "W":
                 light_state = "green_west"
