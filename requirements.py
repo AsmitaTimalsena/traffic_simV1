@@ -58,6 +58,7 @@ b. if vehicle_type==car, from (600,590), rotate  and move upto north direction w
    ##WEST LANE ROAD
 #The vehicles both car or bike  will be generated from these coordinates at west road. West Road is one way:
 (0,520),(0,620),
+
 '''
 1. For the vehicles moving from coordinate: (0,520) only,  for this lane vehicles wont stop for red traffic light of west road.
 They will rather take left turn continuously to move to north road by rotating when they reach coordinate:(440,520).

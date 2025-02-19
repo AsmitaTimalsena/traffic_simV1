@@ -130,7 +130,7 @@ lanes_data = [
         "possible_paths": [
             # [],  # Straight (no turns)
             [{
-                "trigger_point": (800, 530),
+                "trigger_point": (800, 520),
                 "action": "turn_left",   # S->E
                 "new_direction": "E"
             }]
@@ -463,6 +463,7 @@ class Vehicle:
         # if not east_has_red or west_has_green:
         #     self.speed = 0
         #     return False  # Don't remove the vehicle
+        
 
         # 1) Handle red/stop line if needed
         if self.stop_for_red:
@@ -490,6 +491,7 @@ class Vehicle:
         else:
             # This lane ignores red
             self.speed = min(self.speed + 0.2, self.max_speed)
+
 
         
 
@@ -594,7 +596,7 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
         if self.vehicle_type == "bike":
-            self.x, self.y = 530, 480
+            self.x, self.y = 515, 480
         elif self.vehicle_type == "car":
             self.x, self.y = 600, 480
         self.direction = new_dir
@@ -619,6 +621,8 @@ class Vehicle:
         instr = self.turn_instructions[self.turn_index]
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
+        if self.vehicle_type == "bike" and self.x == 440 and self.y == 520:
+            self.x, self.y = 490, 520
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
 
