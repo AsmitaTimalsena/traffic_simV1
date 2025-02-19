@@ -73,16 +73,18 @@ for direction, ddata in directions_data.items():
 #############################################################################
 # TRAFFIC LIGHT CYCLE
 #############################################################################
-direction_order = ["N", "E", "S", "W"]  # cycle order
-direction_index = 0  # starts with "N"
+direction_order = ["N", "W", "S", "E"]  # cycle order
+direction_index = 0  # starts with "S"
 
 light_state = "green"
 light_state_start = pygame.time.get_ticks()
 
 light_durations = {
-    "green": 7000,   # 7 seconds
+    "green": 13000,   # 7 seconds
     "orange": 2000,  # 2 seconds
-    "allred": 1500   # 1.5 seconds of all-red
+    "allred": 1000,  # 1 seconds of all-red
+    "green_west": 6000,  # 6 seconds for green (West)
+    "orange_west": 2000 
 }
 
 def get_light_color_for_direction(dir_name):
@@ -95,11 +97,18 @@ def get_light_color_for_direction(dir_name):
     else:
         return RED
 
-def is_direction_green_or_orange(dir_name):
+def is_direction_green(dir_name):
     """Return True if this direction is currently green/orange, otherwise False."""
     if light_state == "allred":
         return False
-    return (dir_name == direction_order[direction_index])
+    active_direction = direction_order[direction_index]
+    if dir_name == active_direction:
+        if dir_name == "W":
+            return light_state in ["green_west", "orange_west"]
+        else:
+            return light_state in ["green", "orange"]
+    else:
+        return False
 
 #############################################################################
 # LANE DEFINITIONS
@@ -130,7 +139,7 @@ lanes_data = [
         "possible_paths": [
             # [],  # Straight (no turns)
             [{
-                "trigger_point": (800, 520),
+                "trigger_point": (800, 510),
                 "action": "turn_left",   # S->E
                 "new_direction": "E"
             }]
@@ -160,7 +169,7 @@ lanes_data = [
     },
     {
         "name": "North-Lane-3",
-        "spawn": (760, 0),
+        "spawn": (755, 0),
         "vehicle_types": ["bike"],
         "travel_dir": "S",
         "stop_for_red": True,
@@ -252,7 +261,7 @@ lanes_data = [
         "stop_for_red": True,
         "possible_paths": [
             [{
-                "trigger_point": (600,590),
+                "trigger_point": (620,590),
                 "action": "branch_east",
                 "new_direction": "N"
             }],
@@ -430,7 +439,7 @@ class Vehicle:
         
         if dist_to_trigger < 30:
             # If the road to your right has green/orange, yield if conflict
-            if is_direction_green_or_orange(right_side_dir):
+            if is_direction_green(right_side_dir):
                 conflict_found = False
                 for other in all_vehicles:
                     if other is self:
@@ -463,6 +472,7 @@ class Vehicle:
         # if not east_has_red or west_has_green:
         #     self.speed = 0
         #     return False  # Don't remove the vehicle
+        # Ensure vehicles from (520,790) stop at (520,640) if west lane is green
         
 
         # 1) Handle red/stop line if needed
@@ -477,7 +487,7 @@ class Vehicle:
             if stop_line is not None:
                 dist_to_stop = self.distance_to_stop_line(stop_line)
                 # If we haven't crossed the stop line and the light is not green/orange => slow/stop
-                if dist_to_stop > 0 and not is_direction_green_or_orange(self.direction):
+                if dist_to_stop > 0 and not is_direction_green(self.direction):
                     if dist_to_stop < 50:
                         self.speed = max(self.speed - 0.4, 0)
                     else:
@@ -598,7 +608,7 @@ class Vehicle:
         if self.vehicle_type == "bike":
             self.x, self.y = 515, 480
         elif self.vehicle_type == "car":
-            self.x, self.y = 600, 480
+            self.x, self.y = 575, 480
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
 
@@ -680,7 +690,7 @@ while running:
                     lane_list.append(newv)
                     all_vehicles.append(newv)
 
-    # 2) Update traffic-light cycle
+   # 2) Update traffic-light cycle
     elapsed_light = current_time - light_state_start
     if elapsed_light > light_durations[light_state]:
         # Move to the next state
@@ -688,10 +698,17 @@ while running:
             light_state = "orange"
         elif light_state == "orange":
             light_state = "allred"
-        else:
+        elif light_state == "allred":
             # Was allred => move to next direction’s green
             direction_index = (direction_index + 1) % len(direction_order)
-            light_state = "green"
+            if direction_order[direction_index] == "W":
+                light_state = "green_west"
+            else:
+                light_state = "green"
+        elif light_state == "green_west":
+            light_state = "orange_west"
+        elif light_state == "orange_west":
+            light_state = "allred"
         light_state_start = current_time
 
     # 3) Update dash_colors (purely for drawing the lights)
