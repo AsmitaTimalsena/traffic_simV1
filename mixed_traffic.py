@@ -17,7 +17,7 @@ GREEN = (0, 255, 0)
 FPS = 60
 METERS_PER_PIXEL = 5
 
-# Vehicle settings
+
 lanes = [45, 120, 180, 240]
 SEPARATION_DISTANCE = 70
 LANE_CHANGE_DISTANCE = 50 
@@ -36,7 +36,7 @@ distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
 bike_speed_data = {"display_speed": 0, "update_time": 0}
 car_speed_data = {"display_speed": 0, "update_time": 0}
 
-# Speed update interval (milliseconds)
+
 SPEED_UPDATE_INTERVAL = 1000  # 1 second
 
 start_time = pygame.time.get_ticks() 
@@ -52,9 +52,9 @@ class Vehicle:
         self.vtype = vtype
 
         if vtype == "bike":
-            self.speed = random.randint(*self.BIKE_SPEED_RANGE)  # Random speed for bikes (in km/h)
+            self.speed = random.randint(*self.BIKE_SPEED_RANGE)  
         elif vtype == "car":
-            self.speed = random.randint(*self.CAR_SPEED_RANGE)  # Random speed for cars (in km/h)
+            self.speed = random.randint(*self.CAR_SPEED_RANGE) 
 
         #convert speed from km/h to pixels per frame
         self.speed = (self.speed * 1000) / (60 * 60 * METERS_PER_PIXEL)
@@ -107,10 +107,10 @@ class Vehicle:
                     return
         # Reset speed if no vehicle is too close
         if self.speed < self.get_base_speed():
-            self.speed += 0.05  # Gradually return to normal speed
+            self.speed += 0.05  #slowly return to normal speed
 
     def get_base_speed(self):
-        # Get the base speed for the vehicle type
+    
         if self.vtype == "bike":
             return (self.BIKE_SPEED_RANGE[0] * 1000) / (60 * 60 * METERS_PER_PIXEL)
         elif self.vtype == "car":
@@ -118,7 +118,7 @@ class Vehicle:
 
     def attempt_lane_change(self, vehicles):
         if self.vtype != "bike":
-            return  # Only bikes change lanes
+            return 
 
         for other in vehicles:
             if other != self and other.lane == self.lane:
@@ -148,28 +148,26 @@ class Vehicle:
                     return False  # No space in target lane
         return True
 
-# Initialize vehicles
+
 vehicles = []
-for i in range(20):  # Increased number of vehicles from 10 to 20
-    lane = random.choice(lanes)  # Select randomly from valid lanes [45, 120, 180, 240]
-    vtype = random.choices(["bike", "car"], weights=[70, 30])[0]  # 65% for bike, 35% for car
+for i in range(20):  
+    lane = random.choice(lanes) 
+    vtype = random.choices(["bike", "car"], weights=[70, 30])[0]  
     x = lane
-    y = random.randint(-height, 0)  # Random y-coordinate (off-screen to start)
+    y = random.randint(-height, 0)  
     vehicles.append(Vehicle(x, y, lane, vtype))
 
 # Main game loop
 running = True
-clock = pygame.time.Clock()  # Control the frame rate
+clock = pygame.time.Clock() 
 while running:
     # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # Fill the screen with the blue color
     screen.fill(BLUE)
 
-    # Draw a white dashed vertical line starting from (200, 0) downwards
     dash_length = 20
     gap_length = 10
     start_x = 150
@@ -184,19 +182,19 @@ while running:
     bike_speeds = []
     car_speeds = []
     for vehicle in vehicles:
-        vehicle.adjust_speed(vehicles)  # Adjust speed based on proximity
-        vehicle.attempt_lane_change(vehicles)  # Try to change lane if necessary
+        vehicle.adjust_speed(vehicles)  
+        vehicle.attempt_lane_change(vehicles)  
         vehicle.move()  # Move the vehicle
         if vehicle.y > height:
-            vehicle.y = random.randint(-height, 0)  # Respawn at the top
-            total_vehicles_passed += 1  # Increase the counter when the vehicle passes the screen
+            vehicle.y = random.randint(-height, 0) 
+            total_vehicles_passed += 1 
         vehicle.draw(screen)
 
         # Collect speed data
         if vehicle.vtype == "bike":
             bike_speeds.append(vehicle.speed * (60 * 60 * METERS_PER_PIXEL) / 1000)  # Convert back to km/h
         elif vehicle.vtype == "car":
-            car_speeds.append(vehicle.speed * (60 * 60 * METERS_PER_PIXEL) / 1000)  # Convert back to km/h
+            car_speeds.append(vehicle.speed * (60 * 60 * METERS_PER_PIXEL) / 1000)  
 
 
     current_time = pygame.time.get_ticks()
@@ -219,7 +217,7 @@ while running:
     elapsed_seconds %= 60  # remaining seconds
    
 
-    # Display the metrics
+
     font = pygame.font.Font(None, 24)
     y_offset = 150
     text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)

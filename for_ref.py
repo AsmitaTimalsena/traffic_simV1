@@ -18,26 +18,33 @@ ORANGE = (255, 165, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
+# Background image (replace with your intersection image if desired)
 background_image = pygame.image.load("dedicated_laneIMG.png")
 background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
 
+# Global counters
 total_vehicles_passed = 0
 
+# Additional counters for lanes that start from the North (travel_dir="S")
+# We'll define which lanes are "dedicated" vs. "shared."
 dedicated_passed_south = 0
 shared_passed_south = 0
 
+# Decide which lane names are considered "dedicated" if traveling south
 dedicated_lanes = {"North-Car-Outer", "North-Bike-Middle"}
-
+# The rest that travel south are considered "shared."
 
 motorcycle_safe_threshold = 50
 car_safe_threshold = 180
 max_vehicles_per_lane = 15  
 
-
+#############################################################################
+# TRAFFIC LIGHT DATA
+#############################################################################
 directions_data = {
     # Top approach traveling downward
     "S": {
-        "traffic_lights": [(760, 420), (680, 420)],  
+        "traffic_lights": [(760, 420), (680, 420)],  # purely visual
         "stop_line_y": 415
     },
     # Right approach traveling left
@@ -57,16 +64,17 @@ directions_data = {
     }
 }
 
-# Initialize for drawing the traffic lights
+# Initialize the dash_colors (for drawing the traffic lights).
 dash_colors = {}
 for direction, ddata in directions_data.items():
     for coord in ddata["traffic_lights"]:
         dash_colors[coord] = RED
 
-
-
-direction_order = ["N", "W", "S", "E"]  
-direction_index = 0  
+#############################################################################
+# TRAFFIC LIGHT CYCLE
+#############################################################################
+direction_order = ["N", "W", "S", "E"]  # cycle order
+direction_index = 0  # starts with "S"
 
 light_state = "green"
 light_state_start = pygame.time.get_ticks()
@@ -104,19 +112,34 @@ def is_direction_green(dir_name):
             return light_state in ["green", "orange"]
     else:
         return False
-
+#############################################################################
+# LANE DEFINITIONS
+#############################################################################
+# We add a new key: "possible_paths". Each is a list of possible sets of
+# turn_instructions. We pick one randomly at spawn time.
+#
+# For example, to go straight, we'd have an empty list [].
+# For a left turn, we'd have something like:
+# [ { "trigger_point": (X, Y), "action": "turn_left", "new_direction": "E" } ]
+# For a right turn, we similarly define a "turn_right" action.
+# (You can adjust trigger points as needed.)
+#
+# If you want a lane to remain only left-turn or only straight, give it just one item in possible_paths.
+#############################################################################
 
 lanes_data = [
-    # NORTH ROAD (travel_dir = "S")
+    # -------------------------------------------------------
+    # NORTH ROAD (travel_dir = "S"): Vehicles traveling downward
+    # -------------------------------------------------------
     {
         "name": "North-Bike-Middle", 
         "spawn": (800, 0),
         "vehicle_types": ["bike"],
         "travel_dir": "S",
         "stop_for_red": False,
-      
+        # For demonstration, let's say they can either go straight or turn left
         "possible_paths": [
-        
+            # [],  # Straight (no turns)
             [{
                 "trigger_point": (800, 510),
                 "action": "turn_left",   # S->E
@@ -130,7 +153,8 @@ lanes_data = [
         "vehicle_types": ["car"],
         "travel_dir": "S",
         "stop_for_red": False,
-       
+        # For demonstration, let's show left, right, or straight
+        # NOTE: You must adjust trigger points for the right turn if your map supports it.
         "possible_paths": [
             # [],  # Straight
             [{
@@ -140,7 +164,7 @@ lanes_data = [
             }]
             # [{
             #     "trigger_point": (845, 530),
-            #     "action": "turn_right",
+            #     "action": "turn_right",  # S->W  (just as an example)
             #     "new_direction": "W"
             # }]
         ]
@@ -151,7 +175,7 @@ lanes_data = [
         "vehicle_types": ["bike"],
         "travel_dir": "S",
         "stop_for_red": True,
-     
+        # Maybe only straight or left
         "possible_paths": [
             [],  # Straight
             # [{
@@ -167,7 +191,7 @@ lanes_data = [
         "vehicle_types": ["car"],
         "travel_dir": "S",
         "stop_for_red": True,
-      
+        # Maybe they can only go straight. (Adjust if you like.)
         "possible_paths": [
             [],
             # [{
@@ -178,7 +202,9 @@ lanes_data = [
         ]
     },
 
-    # SOUTH ROAD
+    # -------------------------------------------------------
+    # SOUTH ROAD (travel_dir = "N")
+    # -------------------------------------------------------
     {
         "name": "South-Branching-Lane",
         "spawn": (520, 790),
@@ -188,12 +214,12 @@ lanes_data = [
         "possible_paths": [
             [{
                 "trigger_point": (520, 520),
-                "action": "branch",  
-                "new_direction": "N" 
+                "action": "branch",  # Custom action for branching
+                "new_direction": "N"  # Continue North initially
             }
 
 
-            ]  
+            ]  # e.g., no turns, or add your own
         ]
     },
     {
@@ -211,7 +237,9 @@ lanes_data = [
         ]
     },
 
-    #EAST ROAD
+        # -------------------------------------------------------
+    # EAST LANE (travel_dir = "W")
+    # -------------------------------------------------------
     {
         "name": "East-NoStop",
         "spawn": (1280, 650),
@@ -243,7 +271,9 @@ lanes_data = [
         ]
     },
 
-    # WEST ROAD
+    # -------------------------------------------------------
+    # WEST LANE (travel_dir = "E")
+    # -------------------------------------------------------
     {
     "name": "West-LeftTurn",
     "spawn": (0, 520),
@@ -289,7 +319,9 @@ lanes_data = [
     }
 ]
 
-##PER LANE TIMER AND data stracture
+#############################################################################
+# PER-LANE TIMERS & DATA STRUCTURES
+#############################################################################
 lane_vehicles_map = {}
 
 def get_new_event_id():
@@ -305,11 +337,13 @@ for lane_def in lanes_data:
     for vtype in lane_def["vehicle_types"]:
         event_id = get_new_event_id()
         # Adjust spawn intervals if needed
-        spawn_interval = 2300 if vtype == "bike" else 2500
+        spawn_interval = 1200 if vtype == "bike" else 1500
         pygame.time.set_timer(event_id, spawn_interval)
         timers.append((event_id, lane_name, vtype))
 
-#defining the directions/angles
+#############################################################################
+# HELPER FUNCTIONS
+#############################################################################
 def angle_for_dir(direction):
     """Return angle for direction: 0=S, 90=W, 180=N, 270=E."""
     if direction == "N":
@@ -335,7 +369,8 @@ def move_coords(x, y, speed, direction):
 
 def distance_in_travel_dir(pos1, pos2, direction):
     """
-    for distance calculation and collison avoidance
+    Returns how far `pos2` is in front of `pos1` along travel `direction`.
+    If the result is negative, pos2 is behind pos1.
     """
     x1, y1 = pos1
     x2, y2 = pos2
@@ -349,7 +384,9 @@ def distance_in_travel_dir(pos1, pos2, direction):
         return x1 - x2
     return 999999
 
-
+#############################################################################
+# VEHICLE CLASS
+#############################################################################
 class Vehicle:
     def __init__(self, lane_def, vehicle_type, turn_instructions):
         global screen_width, screen_height
@@ -367,11 +404,11 @@ class Vehicle:
         # Initial position
         self.x, self.y = lane_def["spawn"]
 
-        
+        # Visual properties
         if vehicle_type == "bike":
             self.width = 10
             self.height = 25
-            self.max_speed = 2.5
+            self.max_speed = 3.0
         else:
             self.width = 20
             self.height = 40
@@ -424,14 +461,14 @@ class Vehicle:
         global total_vehicles_passed
         global dedicated_passed_south, shared_passed_south
        
-        # logic for south directional lane (520, 790)
+        # Special logic for south directional lane (520, 790)
         if self.lane_def["name"] == "South-Branching-Lane":
-           
+            # Get west direction traffic light status
             west_light_color = get_light_color_for_direction("E")
             
             # If west has green or orange (is_direction_green includes both states)
             if is_direction_green("E"):
-                
+                # Calculate distance to stopping point (520, 640)
                 dist_to_stop = math.hypot(self.x - 520, self.y - 690)
                 
                 # If we're approaching the stop point, gradually slow down
@@ -441,8 +478,8 @@ class Vehicle:
                   # If we're exactly at y=690, stop completely
                 elif abs(self.y - 690) < 1:  # Using small threshold for floating point comparison
                     self.speed = 0
-                    self.y = 690  
-                    return False  
+                    self.y = 690  # Ensure exact positioning
+                    return False  # Don't remove the vehicle
                 # If we're past y=690, continue moving normally
                 elif self.y > 690:
                     self.speed = min(self.speed + 0.2, self.max_speed)
@@ -514,17 +551,22 @@ class Vehicle:
                 total_vehicles_passed += 1
                 self.has_been_counted = True
 
+                # Also check if it originally traveled S (meaning it spawned from top/north)
+                # and increment either dedicated or shared
                 if self.lane_def["travel_dir"] == "S":
                     if self.lane_def["name"] in dedicated_lanes:
                         dedicated_passed_south += 1
                     else:
                         shared_passed_south += 1
 
-            return True  
+            return True  # signal removal
         return False
 
     def distance_to_stop_line(self, stop_line):
-        
+        """
+        Returns how far we are from the stop line along our travel direction.
+        Positive => haven't reached the line yet, negative => we've passed it.
+        """
         half_len = (self.height / 2) if self.direction in ("N","S") else (self.width / 2)
 
         if self.direction == "S":
@@ -560,7 +602,7 @@ class Vehicle:
                 self.move_east(instr["new_direction"])
             elif action == "turn_straight_east":
                 self.turn_straight_east(instr["new_direction"])
-           
+            # You can add "branch" or other actions here if needed.
             self.turn_index += 1
     def move_east(self, new_dir):
         """
@@ -569,7 +611,7 @@ class Vehicle:
         if self.x < 700:
             self.x += self.speed  # Move east
         else:
-           
+            # Once the vehicle reaches (700, 600), continue to the next instruction
             pass
 
     def turn_straight_east(self, new_dir):
@@ -577,9 +619,9 @@ class Vehicle:
         Move the vehicle straight east to (720, 530).
         """
         if self.y > 530:
-            self.y -= self.speed  
+            self.y -= self.speed  # Move up
         else:
-           
+            # Once the vehicle reaches (720, 530), continue east
             self.direction = new_dir
             self.angle = angle_for_dir(new_dir)
 
@@ -589,7 +631,7 @@ class Vehicle:
         Move the vehicle up to (680, 550) before turning left.
         """
         if self.y > 550:
-            self.y -= self.speed  
+            self.y -= self.speed  # Move up
         else:
             # Once the vehicle reaches (680, 550), turn left
             self.turn_left(new_dir)
@@ -610,13 +652,13 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty  # Move to the branching point (600, 590)
         
-        
+        # Branch based on vehicle type
         if self.vehicle_type == "bike":
-            self.x, self.y = 530, 590  
+            self.x, self.y = 530, 590  # Move to bike-only lane
         elif self.vehicle_type == "car":
-            self.x, self.y = 600, 590  
+            self.x, self.y = 600, 590  # Move to car-only lane
         
-        # Rotate to goo north
+        # Rotate and move north
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
 
@@ -646,7 +688,9 @@ class Vehicle:
         rect = rotated_surf.get_rect(center=(self.x, self.y))
         surface.blit(rotated_surf, rect)
 
-
+#############################################################################
+# MAIN LOOP
+#############################################################################
 clock = pygame.time.Clock()
 running = True
 all_vehicles = []
@@ -655,15 +699,15 @@ while running:
     dt = clock.tick(60)
     current_time = pygame.time.get_ticks()
 
-   
+    # 1) Handle events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-        
+        # Check spawn events
         for (ev_id, lane_name, vtype) in timers:
             if event.type == ev_id:
-                
+                # Find the lane definition
                 lane_def = None
                 for ld in lanes_data:
                     if ld["name"] == lane_name:
@@ -674,7 +718,7 @@ while running:
 
                 lane_list = lane_vehicles_map[lane_name]
                 if len(lane_list) < max_vehicles_per_lane:
-                 
+                    # Randomly choose one of the possible paths for this lane
                     chosen_path = random.choice(lane_def["possible_paths"])
                     # Create a new vehicle with that path
                     newv = Vehicle(lane_def, vtype, chosen_path)
@@ -702,22 +746,22 @@ while running:
             light_state = "allred"
         light_state_start = current_time
 
-    # 3) Update traffic lights
+    # 3) Update dash_colors (purely for drawing the lights)
     for direction, ddata in directions_data.items():
         color = get_light_color_for_direction(direction)
         for coord in ddata["traffic_lights"]:
             dash_colors[coord] = color
 
-    
+    # 4) Draw the background
     screen.blit(background_image, (0, 0))
 
-    
+    # 5) Draw the traffic lights (the little colored dashes)
     dash_length = 20
     dash_thickness = 5
     for direction, ddata in directions_data.items():
         for (lx, ly) in ddata["traffic_lights"]:
             color = dash_colors.get((lx, ly), RED)
-            if direction in ("N", "S"): #horizontal dash draw 
+            if direction in ("N", "S"):  # draw a horizontal dash
                 pygame.draw.line(screen, color,
                                  (lx - dash_length//2, ly),
                                  (lx + dash_length//2, ly),
@@ -754,13 +798,14 @@ while running:
     txt = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, (255,255,255))
     screen.blit(txt, (20, 50))
 
-    # # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)
-    # dedicated_txt = font.render(f"DEDICATED LANES RATE: {dedicated_passed_south}", True, (255,255,255))
-    # screen.blit(dedicated_txt, (20, 80))
+    # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)
+    dedicated_txt = font.render(f"DEDICATED LANES RATE: {dedicated_passed_south}", True, (255,255,255))
+    screen.blit(dedicated_txt, (20, 80))
 
-    # shared_txt = font.render(f"SHARED LANES RATE: {shared_passed_south}", True, (255,255,255))
-    # screen.blit(shared_txt, (20, 110))
+    shared_txt = font.render(f"SHARED LANES RATE: {shared_passed_south}", True, (255,255,255))
+    screen.blit(shared_txt, (20, 110))
 
+    # 8) Flip screen
     pygame.display.flip()
 
 pygame.quit()
