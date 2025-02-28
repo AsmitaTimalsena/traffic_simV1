@@ -74,9 +74,9 @@ light_state_start = pygame.time.get_ticks()
 light_durations = {
     "green": 13000,       
     "orange": 2000,     
-    "allred": 1000,       
+    "allred": 2000,       
     "green_west": 6000,   
-    "orange_west": 2000   
+    "orange_west": 3000   
 }
 
 def get_light_color_for_direction(dir_name):
@@ -99,9 +99,9 @@ def is_direction_green(dir_name):
     active_direction = direction_order[direction_index]
     if dir_name == active_direction:
         if dir_name == "W":
-            return light_state in ["green_west", "orange_west"]
+            return light_state in ["green_west"]
         else:
-            return light_state in ["green", "orange"]
+            return light_state in ["green"]
     else:
         return False
 
@@ -181,13 +181,13 @@ lanes_data = [
     # SOUTH ROAD
     {
         "name": "South-Branching-Lane",
-        "spawn": (520, 790),
+        "spawn": (515, 790),
         "vehicle_types": ["car", "bike"],
         "travel_dir": "N",
         "stop_for_red": False,
         "possible_paths": [
             [{
-                "trigger_point": (520, 520),
+                "trigger_point": (515, 520),
                 "action": "branch",  
                 "new_direction": "N" 
             }
@@ -235,7 +235,7 @@ lanes_data = [
         "stop_for_red": True,
         "possible_paths": [
             [{
-                "trigger_point": (620,590),
+                "trigger_point": (625,590),
                 "action": "branch_east",
                 "new_direction": "N"
             }],
@@ -272,6 +272,13 @@ lanes_data = [
                     "new_direction": "S"
                 }
             ],
+            [
+                {
+                    "trigger_point": (720, 600),
+                    "action": "move_west_to_east",  
+                    "new_direction": "E"
+                }
+            ]
             # [
             #     {
             #         "trigger_point": (700, 600),
@@ -423,6 +430,8 @@ class Vehicle:
     def move_and_collide(self, lane_vehicles, all_vehicles):
         global total_vehicles_passed
         global dedicated_passed_south, shared_passed_south
+
+        
        
         # logic for south directional lane (520, 790)
         if self.lane_def["name"] == "South-Branching-Lane":
@@ -430,7 +439,8 @@ class Vehicle:
             west_light_color = get_light_color_for_direction("E")
             
             # If west has green or orange (is_direction_green includes both states)
-            if is_direction_green("E"):
+            if get_light_color_for_direction("E") in [GREEN, ORANGE]:
+
                 
                 dist_to_stop = math.hypot(self.x - 520, self.y - 690)
                 
@@ -556,6 +566,8 @@ class Vehicle:
                 self.branch(instr["new_direction"])
             elif action == "branch_east":
                 self.branch_east(instr["new_direction"])
+            elif action == "move_west_to_east":
+                self.move_west_to_east(instr["new_direction"])
             elif action == "move_east":
                 self.move_east(instr["new_direction"])
             elif action == "turn_straight_east":
@@ -599,20 +611,29 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
         if self.vehicle_type == "bike":
-            self.x, self.y = 515, 480
+            self.x, self.y = 510, 480
         elif self.vehicle_type == "car":
             self.x, self.y = 575, 480
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
+    
+    def move_west_to_east(self, new_dir):
+       
+        instr = self.turn_instructions[self.turn_index]  
+        self.x, self.y = instr["trigger_point"]  
+        self.x, self.y = 680, 540  
+        self.direction = new_dir
+        self.angle = angle_for_dir(new_dir)
+
 
     def branch_east(self, new_dir):
         instr = self.turn_instructions[self.turn_index]
         tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty  # Move to the branching point (600, 590)
+        self.x, self.y = tx, ty  
         
         
         if self.vehicle_type == "bike":
-            self.x, self.y = 530, 590  
+            self.x, self.y = 538, 590  
         elif self.vehicle_type == "car":
             self.x, self.y = 600, 590  
         
@@ -625,7 +646,7 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
         if self.vehicle_type == "bike" and self.x == 440 and self.y == 520:
-            self.x, self.y = 490, 520
+            self.x, self.y = 480, 520
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
 
@@ -752,7 +773,19 @@ while running:
 
     # 7) Show total passed
     txt = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, (255,255,255))
-    screen.blit(txt, (20, 50))
+    screen.blit(txt, (100, 100))
+
+    text_n = font.render( "N", True, (255,255,255))
+    screen.blit(text_n, (370,100))
+
+    text_n = font.render( "W", True, (255,255,255))
+    screen.blit(text_n, (100,700))
+
+    text_n = font.render( "S", True, (255,255,255))
+    screen.blit(text_n, (820,730))
+
+    text_n = font.render( "E", True, (255,255,255))
+    screen.blit(text_n, (1110,390))
 
     # # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)
     # dedicated_txt = font.render(f"DEDICATED LANES RATE: {dedicated_passed_south}", True, (255,255,255))

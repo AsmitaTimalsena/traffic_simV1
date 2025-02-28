@@ -68,7 +68,7 @@ b. if vehicle_type==car, once they reach (440,520) simply  rotate and move upto 
 2. For the vehicles moving from coordinate: (0,620) only,  for this lane vehicles will stop for red traffic light of west road.
 When the light is green, the vehicles move straight to:(680,620) and then :
 i. rotate to move to south road. 
-ii. OR it will move up  to short distance till:(680,550), and then rotate to move to east road.
+ii. OR it will move up  to short distance till:(680,520), and then rotate to move to east road.
 '''
 
 '''
