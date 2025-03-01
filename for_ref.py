@@ -181,13 +181,13 @@ lanes_data = [
     # SOUTH ROAD
     {
         "name": "South-Branching-Lane",
-        "spawn": (520, 790),
+        "spawn": (515, 790),
         "vehicle_types": ["car", "bike"],
         "travel_dir": "N",
         "stop_for_red": False,
         "possible_paths": [
             [{
-                "trigger_point": (520, 520),
+                "trigger_point": (515, 520),
                 "action": "branch",  
                 "new_direction": "N" 
             }
@@ -235,7 +235,7 @@ lanes_data = [
         "stop_for_red": True,
         "possible_paths": [
             [{
-                "trigger_point": (620,590),
+                "trigger_point": (625,590),
                 "action": "branch_east",
                 "new_direction": "N"
             }],
@@ -272,6 +272,13 @@ lanes_data = [
                     "new_direction": "S"
                 }
             ],
+            [
+                {
+                    "trigger_point": (720, 600),
+                    "action": "move_west_to_east",  
+                    "new_direction": "E"
+                }
+            ]
             # [
             #     {
             #         "trigger_point": (700, 600),
@@ -559,6 +566,8 @@ class Vehicle:
                 self.branch(instr["new_direction"])
             elif action == "branch_east":
                 self.branch_east(instr["new_direction"])
+            elif action == "move_west_to_east":
+                self.move_west_to_east(instr["new_direction"])
             elif action == "move_east":
                 self.move_east(instr["new_direction"])
             elif action == "turn_straight_east":
@@ -602,20 +611,29 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
         if self.vehicle_type == "bike":
-            self.x, self.y = 515, 480
+            self.x, self.y = 510, 480
         elif self.vehicle_type == "car":
             self.x, self.y = 575, 480
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
+    
+    def move_west_to_east(self, new_dir):
+       
+        instr = self.turn_instructions[self.turn_index]  
+        self.x, self.y = instr["trigger_point"]  
+        self.x, self.y = 680, 540  
+        self.direction = new_dir
+        self.angle = angle_for_dir(new_dir)
+
 
     def branch_east(self, new_dir):
         instr = self.turn_instructions[self.turn_index]
         tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty  # Move to the branching point (600, 590)
+        self.x, self.y = tx, ty  
         
         
         if self.vehicle_type == "bike":
-            self.x, self.y = 530, 590  
+            self.x, self.y = 538, 590  
         elif self.vehicle_type == "car":
             self.x, self.y = 600, 590  
         
@@ -628,7 +646,7 @@ class Vehicle:
         tx, ty = instr["trigger_point"]
         self.x, self.y = tx, ty
         if self.vehicle_type == "bike" and self.x == 440 and self.y == 520:
-            self.x, self.y = 490, 520
+            self.x, self.y = 480, 520
         self.direction = new_dir
         self.angle = angle_for_dir(new_dir)
 
@@ -666,33 +684,23 @@ while running:
         
         for (ev_id, lane_name, vtype) in timers:
             if event.type == ev_id:
-                lane_def = next((ld for ld in lanes_data if ld["name"] == lane_name), None)
+                
+                lane_def = None
+                for ld in lanes_data:
+                    if ld["name"] == lane_name:
+                        lane_def = ld
+                        break
                 if not lane_def:
                     continue
 
                 lane_list = lane_vehicles_map[lane_name]
-
-                # Get the last vehicle in the lane to maintain spacing
-                last_vehicle = lane_list[-1] if lane_list else None
-                min_spacing = motorcycle_safe_threshold if vtype == "bike" else car_safe_threshold
-
-                if last_vehicle:
-                    # Calculate distance to last vehicle
-                    last_x, last_y = last_vehicle.x, last_vehicle.y
-                    spawn_x, spawn_y = lane_def["spawn"]
-                    distance_to_last = distance_in_travel_dir((last_x, last_y), (spawn_x, spawn_y), lane_def["travel_dir"])
-
-                    # Ensure there's enough space for a new vehicle to spawn
-                    if distance_to_last < min_spacing:
-                        continue  # Skip this cycle, wait for next spawn event
-
-                # Spawn the new vehicle normally
-                chosen_path = random.choice(lane_def["possible_paths"])
-                newv = Vehicle(lane_def, vtype, chosen_path)
-                lane_list.append(newv)
-                all_vehicles.append(newv)
-
-
+                if len(lane_list) < max_vehicles_per_lane:
+                 
+                    chosen_path = random.choice(lane_def["possible_paths"])
+                    # Create a new vehicle with that path
+                    newv = Vehicle(lane_def, vtype, chosen_path)
+                    lane_list.append(newv)
+                    all_vehicles.append(newv)
 
    # 2) Update traffic-light cycle
     elapsed_light = current_time - light_state_start
@@ -765,7 +773,19 @@ while running:
 
     # 7) Show total passed
     txt = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, (255,255,255))
-    screen.blit(txt, (20, 50))
+    screen.blit(txt, (100, 100))
+
+    text_n = font.render( "N", True, (255,255,255))
+    screen.blit(text_n, (370,100))
+
+    text_n = font.render( "W", True, (255,255,255))
+    screen.blit(text_n, (100,700))
+
+    text_n = font.render( "S", True, (255,255,255))
+    screen.blit(text_n, (820,730))
+
+    text_n = font.render( "E", True, (255,255,255))
+    screen.blit(text_n, (1110,390))
 
     # # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)
     # dedicated_txt = font.render(f"DEDICATED LANES RATE: {dedicated_passed_south}", True, (255,255,255))

@@ -8,15 +8,15 @@ pygame.init()
 width, height = 800, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Dedicated lanes vehicle simulation')
-# Real-world and simulation constants
-REAL_WORLD_HEIGHT = 200  # Real-world height in meters
-SCREEN_HEIGHT = 700  # Screen height in pixels
-FPS = 30  # Frames per second
+
+REAL_WORLD_HEIGHT = 200  
+SCREEN_HEIGHT = 700  
+FPS = 30  
 distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
 
 # Define target speed ranges
 MOTORCYCLE_MIN_SPEED = 5
-MOTORCYCLE_MAX_SPEED = 8
+MOTORCYCLE_MAX_SPEED = 7.5
 CAR_MIN_SPEED = 4
 CAR_MAX_SPEED = 6
 
@@ -73,7 +73,7 @@ class Vehicle:
         self.original_speed = self.speed
         self.prev_y = self.y
 
-        # Define size
+       
         if vehicle_type == "motorcycle":
             self.size = random.randint(8, 10)  
         elif vehicle_type == "car":
@@ -101,7 +101,7 @@ class Vehicle:
                 # Too close, adjust speed to avoid collision
                 self.speed = max(closest_vehicle.speed - 0.5, 0)
             elif closest_distance > 70:
-                # Safe distance, increase speed slightly
+                
                 self.speed = min(self.max_speed, self.original_speed + 0.5)
             else:
                 # Moderate distance, maintain original speed
