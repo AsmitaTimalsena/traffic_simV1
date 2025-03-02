@@ -16,7 +16,7 @@ plt.figure(figsize=(10, 6))
 plt.bar(r1, dedicated_lane_counts, width=bar_width, color='skyblue', label='Dedicated Lanes')
 plt.bar(r2, shared_lane_counts, width=bar_width, color='lightgreen', label='Shared Lanes')
 
-# Adding labels and title
+
 plt.xlabel('Simulation Number (No of times simulation was run for span of 30 seconds for each scenario)')
 plt.ylabel('Vehicles Passed')
 plt.title('Comparison of Vehicles Passed in Dedicated vs Shared Lanes')

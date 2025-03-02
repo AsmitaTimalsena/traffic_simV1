@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Time (in seconds)
+
 time = list(range(30))  # 0 to 29 seconds
 
-# # Bike and car speed data extracted from your simulation
+
 # bike_speeds = [36.01, 36.17, 39.54, 39.54, 39.39, 38.26, 38.56, 38.56, 36.85, 38.56,
 #                38.56, 38.56, 38.56, 38.56, 38.56, 38.56, 36.78, 34.91, 36.52, 38.02,
 #                38.02, 38.02, 38.02, 38.02, 38.02, 38.02, 36.35, 38.02, 38.02, 38.02]
@@ -12,7 +12,7 @@ time = list(range(30))  # 0 to 29 seconds
 # car_speeds = [29.60, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 29.83,
 #               31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74,
 #               31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74]
-# Bike and car speed data extracted from your simulation
+
 bike_speeds = [36.01, 36.17, 39.54, 39.54, 38.39, 38.26, 38.56, 38.56, 36.85, 38.56,
                38.00, 38.00, 38.56, 38.56, 38.56, 38.56, 36.78, 34.91, 36.52, 38.02,
                38.02, 39.02, 39.02, 38.02, 38.02, 38.02, 36.35, 38.02, 38.02, 38.02]
@@ -21,26 +21,26 @@ car_speeds = [29.60, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 32.08, 29.
               31.74, 31.74, 30.74, 30.74, 30.74, 31.74, 31.74, 29.74, 29.74, 29.74,
               30.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74, 31.74]
 
-# Create the plot
+
 plt.figure(figsize=(10, 5))
 
-# Line plots with markers
+
 plt.plot(time, bike_speeds, marker='o', linestyle='-', color='blue', label='Bike Speed')
 plt.plot(time, car_speeds, marker='s', linestyle='-', color='red', label='Car Speed')
 
-# Labels and title
+
 plt.xlabel('Time (seconds)')
 plt.ylabel('Speed (km/hr)')
 plt.title('Speed Variation Over Time of four wheelers and bikes in Shared Lanes')
 plt.legend()
 
-# Adjust Y-axis ticks to show every integer speed (29, 30, 31, ...)
+
 plt.yticks(np.arange(min(car_speeds + bike_speeds), max(car_speeds + bike_speeds) + 1, 1))
 
-# Show grid for better readability
+
 plt.grid(True, linestyle='--', alpha=0.5)
 
-# Show the plot
+
 plt.show()
 
 

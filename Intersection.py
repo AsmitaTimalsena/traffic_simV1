@@ -37,17 +37,17 @@ max_vehicles_per_lane = 5
 
 
 directions_data = {
-    # Top approach traveling downward
+    
     "S": {"traffic_lights": [(760, 420), (680, 420)], "stop_line_y": 415},
-    # Right approach traveling left
+  
     "W": {"traffic_lights": [(880, 590)], "stop_line_x": 875},
-    # Bottom approach traveling upward
+    
     "N": {"traffic_lights": [(600, 690)], "stop_line_y": 670},
-    # Left approach traveling right
+  
     "E": {"traffic_lights": [(400, 600)], "stop_line_x": 405},
 }
 
-# Initialize for drawing the traffic lights
+
 dash_colors = {}
 for direction, ddata in directions_data.items():
     for coord in ddata["traffic_lights"]:
@@ -196,7 +196,7 @@ lanes_data = [
         "vehicle_types": ["car", "bike"],
         "travel_dir": "W",
         "stop_for_red": False,
-        "max_vehicles": 6,  # Shorter lane
+        "max_vehicles": 6, 
         "possible_paths": [
             [
                 {
@@ -213,7 +213,7 @@ lanes_data = [
         "vehicle_types": ["car", "bike"],
         "travel_dir": "W",
         "stop_for_red": True,
-        "max_vehicles": 5,  # Standard lane
+        "max_vehicles": 5, 
         "possible_paths": [
             [
                 {
@@ -285,13 +285,12 @@ for lane_def in lanes_data:
     lane_vehicles_map[lane_name] = []
     for vtype in lane_def["vehicle_types"]:
         event_id = get_new_event_id()
-        # Adjust spawn intervals if needed
         spawn_interval = 2300 if vtype == "bike" else 2500
         pygame.time.set_timer(event_id, spawn_interval)
         timers.append((event_id, lane_name, vtype))
 
 
-# defining the directions/angles
+
 def angle_for_dir(direction):
     """Return angle for direction: 0=S, 90=W, 180=N, 270=E."""
     if direction == "N":
@@ -342,7 +341,6 @@ class Vehicle:
         self.lane_def = lane_def
         self.vehicle_type = vehicle_type
 
-        # Current direction (N,S,E,W)
         self.direction = lane_def["travel_dir"]
         self.stop_for_red = lane_def["stop_for_red"]
 
@@ -351,17 +349,16 @@ class Vehicle:
 
         # Initial position
         self.x, self.y = lane_def["spawn"]
-
-        # Random scaling factor for vehicle size
+   
         size_scale = random.uniform(0.8, 1.2)  # Random scaling between 80% and 120%
 
         if vehicle_type == "bike":
-            self.width = int(10 * size_scale)  # Random width between 8 and 12
-            self.height = int(25 * size_scale)  # Random height between 20 and 30
+            self.width = int(10 * size_scale)   
+            self.height = int(25 * size_scale)  
             self.max_speed = 2.5
         else:
-            self.width = int(20 * size_scale)  # Random width between 16 and 24
-            self.height = int(40 * size_scale)  # Random height between 32 and 48
+            self.width = int(20 * size_scale)  # width between 16 and 24
+            self.height = int(40 * size_scale)  # height between 32 and 48
             self.max_speed = 2.0
 
         self.speed = random.uniform(self.max_speed * 0.8, self.max_speed)
@@ -379,7 +376,7 @@ class Vehicle:
 
         instr = self.turn_instructions[self.turn_index]
         if instr["action"] != "turn_left":
-            return  # only yield on left turns
+            return 
 
         # Mapping to find which direction is on your right:
         dir_to_right = {"N": "W", "E": "N", "S": "E", "W": "S"}
