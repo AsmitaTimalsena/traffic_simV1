@@ -3,7 +3,7 @@ import numpy as np
 
 # Simulation data
 simulation_number = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-dedicated_lane_collision_counts = [1, 0, 1, 0, 1, 0, 1, 1, 0, 1]
+dedicated_lane_collision_counts = [1, 0, 1, 0, 1, 0, 1, 0, 0, 1]
 shared_lane_collision_counts = [2, 4, 8, 2, 3, 0, 7, 3, 1, 4]
 
 # Bar chart parameters
