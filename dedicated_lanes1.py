@@ -157,6 +157,11 @@ def check_collisions():
     # Since vehicles stay in their own lanes, we should only detect rear-end collisions
     global collision_count
     
+    # Reset collision flags for all vehicles
+    for lane, lane_vehicles in vehicles.items():
+        for vehicle in lane_vehicles:
+            vehicle.in_collision = False
+    
     for lane, lane_vehicles in vehicles.items():
         # Sort vehicles in lane by y-position (front to back)
         sorted_vehicles = sorted(lane_vehicles, key=lambda v: v.y)
@@ -237,9 +242,19 @@ def calculate_average_speeds():
 # Main loop
 running = True
 clock = pygame.time.Clock()
+simulation_duration = 60  # 1 minute in seconds
+
 while running:
     clock.tick(FPS)
     current_time = pygame.time.get_ticks()
+    elapsed_time = (current_time - start_time) // 1000  # Elapsed time in seconds
+
+    # Stop the simulation after 1 minute
+    if elapsed_time >= simulation_duration:
+        running = False
+        print("Simulation ended after 1 minute.")
+        break
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -302,10 +317,8 @@ while running:
             vehicle.draw(screen)
 
     # Calculate elapsed time
-    elapsed_time = pygame.time.get_ticks() - start_time  # in milliseconds
-    elapsed_seconds = elapsed_time // 1000  #  seconds
-    elapsed_minutes = elapsed_seconds // 60  #  minutes
-    elapsed_seconds %= 60  # Remaining seconds
+    elapsed_minutes = elapsed_time // 60  # minutes
+    elapsed_seconds = elapsed_time % 60  # seconds
 
     font = pygame.font.Font(None, 24)
     y_offset = 150
@@ -337,9 +350,7 @@ while running:
     current_time = time.time()
     if current_time - last_print_time >= 1.0:  #every second printing
         car_avg, bike_avg = calculate_average_speeds()
-        minutes = elapsed_minutes
-        seconds = elapsed_seconds
-        print(f"Time {minutes:02d}:{seconds:02d} - Car Avg Speed: {car_avg:.2f} km/hr, Bike Avg Speed: {bike_avg:.2f} km/hr")
+        print(f"Time {elapsed_minutes:02d}:{elapsed_seconds:02d} - Car Avg Speed: {car_avg:.2f} km/hr, Bike Avg Speed: {bike_avg:.2f} km/hr")
         last_print_time = current_time
 
     pygame.display.flip()

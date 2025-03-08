@@ -1,800 +1,352 @@
 import pygame
 import random
-import math
-import sys
+import time
 
 pygame.init()
 
-screen_width = 1280
-screen_height = 800
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Multi-Lane Vehicle Simulation")
+width, height = 800, 700
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption('Dedicated lanes vehicle simulation')
 
-# Colors
+REAL_WORLD_HEIGHT = 200  
+SCREEN_HEIGHT = 700  
+FPS = 30  
+distance_per_pixel = REAL_WORLD_HEIGHT / SCREEN_HEIGHT  # 0.286 m/pixel
+
+MOTORCYCLE_MIN_SPEED = 6
+MOTORCYCLE_MAX_SPEED = 7
+CAR_MIN_SPEED = 4
+CAR_MAX_SPEED = 5.5
+
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 100)
 YELLOW = (255, 255, 0)
-ORANGE = (255, 165, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-
-background_image = pygame.image.load("dedicated_laneIMG.png")
-background_image = pygame.transform.scale(background_image, (screen_width, screen_height))
+RED = (255, 0, 0)  # Added for collision indication
 
 total_vehicles_passed = 0
+collision_count = 0  # Initialize collision counter
 
-dedicated_passed_south = 0
-shared_passed_south = 0
-
-dedicated_lanes = {"North-Car-Outer", "North-Bike-Middle"}
-
-
-motorcycle_safe_threshold = 50
-car_safe_threshold = 180
-max_vehicles_per_lane = 15  
-
-
-directions_data = {
-    # Top approach traveling downward
-    "S": {
-        "traffic_lights": [(760, 420), (680, 420)],  
-        "stop_line_y": 415
-    },
-    # Right approach traveling left
-    "W": {
-        "traffic_lights": [(880, 590)],
-        "stop_line_x": 875
-    },
-    # Bottom approach traveling upward
-    "N": {
-        "traffic_lights": [(600, 690)],
-        "stop_line_y": 695
-    },
-    # Left approach traveling right
-    "E": {
-        "traffic_lights": [(400, 600)],
-        "stop_line_x": 405
-    }
+car_velocity_data = {
+    45: {"display_speed": 0, "update_time": 0},
+    240: {"display_speed": 0, "update_time": 0}
 }
 
-# Initialize for drawing the traffic lights
-dash_colors = {}
-for direction, ddata in directions_data.items():
-    for coord in ddata["traffic_lights"]:
-        dash_colors[coord] = RED
-
-
-
-direction_order = ["N", "W", "S", "E"]  
-direction_index = 0  
-
-light_state = "green"
-light_state_start = pygame.time.get_ticks()
-
-light_durations = {
-    "green": 13000,       
-    "orange": 2000,     
-    "allred": 2000,       
-    "green_west": 6000,   
-    "orange_west": 3000   
+motorcycle_velocity_data = {
+    120: {"display_speed": 0, "update_time": 0},
+    180: {"display_speed": 0, "update_time": 0}
 }
 
-def get_light_color_for_direction(dir_name):
-    """Return the color for the given direction depending on the current state."""
-    if light_state == "allred":
-        return RED
-    active_direction = direction_order[direction_index]
-    if dir_name == active_direction:
-        if dir_name == "W":
-            return GREEN if light_state == "green_west" else ORANGE
-        else:
-            return GREEN if light_state == "green" else ORANGE
+SPEED_UPDATE_INTERVAL = 1000  
+
+def calculate_real_speed(pixels_per_frame):
+    """Convert simulation speed to km/h"""
+    meters_per_frame = pixels_per_frame * distance_per_pixel
+    meters_per_second = meters_per_frame * FPS
+    kilometers_per_hour = (meters_per_second * 3600) / 1000
+    return kilometers_per_hour
+
+def normalize_speed(speed, vehicle_type):
+    """Normalize speed to the appropriate range"""
+    if vehicle_type == "motorcycle":
+        return max(MOTORCYCLE_MIN_SPEED, min(MOTORCYCLE_MAX_SPEED, speed))
     else:
-        return RED
+        return max(CAR_MIN_SPEED, min(CAR_MAX_SPEED, speed))
 
-def is_direction_green(dir_name):
-    """Return True if this direction is currently green/orange, otherwise False."""
-    if light_state == "allred":
-        return False
-    active_direction = direction_order[direction_index]
-    if dir_name == active_direction:
-        if dir_name == "W":
-            return light_state in ["green_west"]
-        else:
-            return light_state in ["green"]
-    else:
-        return False
-
-
-lanes_data = [
-    # NORTH ROAD (travel_dir = "S")
-    {
-        "name": "North-Bike-Middle", 
-        "spawn": (800, 0),
-        "vehicle_types": ["bike"],
-        "travel_dir": "S",
-        "stop_for_red": False,
-      
-        "possible_paths": [
-        
-            [{
-                "trigger_point": (800, 510),
-                "action": "turn_left",   # S->E
-                "new_direction": "E"
-            }]
-        ]
-    },
-    {
-        "name": "North-Car-Outer",
-        "spawn": (850, 0),
-        "vehicle_types": ["car"],
-        "travel_dir": "S",
-        "stop_for_red": False,
-       
-        "possible_paths": [
-            # [],  # Straight
-            [{
-                "trigger_point": (845, 470),
-                "action": "turn_left",  # S->E
-                "new_direction": "E"
-            }]
-            # [{
-            #     "trigger_point": (845, 530),
-            #     "action": "turn_right",
-            #     "new_direction": "W"
-            # }]
-        ]
-    },
-    {
-        "name": "North-Lane-3",
-        "spawn": (755, 0),
-        "vehicle_types": ["bike"],
-        "travel_dir": "S",
-        "stop_for_red": True,
-     
-        "possible_paths": [
-            [],  # Straight
-            # [{
-            #     "trigger_point": (760, 520),
-            #     "action": "turn_left",
-            #     "new_direction": "E"
-            # }]
-        ]
-    },
-    {
-        "name": "North-Lane-4",
-        "spawn": (680, 0),
-        "vehicle_types": ["car"],
-        "travel_dir": "S",
-        "stop_for_red": True,
-      
-        "possible_paths": [
-            [],
-            # [{
-            #     "trigger_point": (680, 610),
-            #     "action": "turn_right",  # S->E
-            #     "new_direction": "W"
-            # }]
-        ]
-    },
-
-    # SOUTH ROAD
-    {
-        "name": "South-Branching-Lane",
-        "spawn": (515, 790),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "N",
-        "stop_for_red": False,
-        "possible_paths": [
-            [{
-                "trigger_point": (515, 520),
-                "action": "branch",  
-                "new_direction": "N" 
-            }
-
-
-            ]  
-        ]
-    },
-    {
-        "name": "South-Lane-StopForRed",
-        "spawn": (600, 790),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "N",
-        "stop_for_red": True,
-        "possible_paths": [
-            [{
-                "trigger_point": (600, 540),
-                "action": "turn_right",  # N->E
-                "new_direction": "E"
-            }]
-        ]
-    },
-
-    #EAST ROAD
-    {
-        "name": "East-NoStop",
-        "spawn": (1280, 650),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "W",
-        "stop_for_red": False,
-        "possible_paths": [
-            [{
-                "trigger_point": (770, 650),
-                "action": "turn_left",  # W->S
-                "new_direction": "S"
-            }],
-           
-        ]
-    },
-    {
-        "name": "East-StopThenBranch",
-        "spawn": (1280, 590),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "W",
-        "stop_for_red": True,
-        "possible_paths": [
-            [{
-                "trigger_point": (625,590),
-                "action": "branch_east",
-                "new_direction": "N"
-            }],
-            # []  # straight
-        ]
-    },
-
-    # WEST ROAD
-    {
-    "name": "West-LeftTurn",
-    "spawn": (0, 520),
-    "vehicle_types": ["car", "bike"],
-    "travel_dir": "E",
-    "stop_for_red": False,  # Vehicles won't stop for red traffic light
-    "possible_paths": [
-        [{
-            "trigger_point": (440, 520),
-            "action": "turn_left",  # Turn left to move north
-            "new_direction": "N"
-        }]
-    ]
-    },
-    {
-        "name": "West-StopThenMultiTurn",
-        "spawn": (0, 600),
-        "vehicle_types": ["car", "bike"],
-        "travel_dir": "E",
-        "stop_for_red": True,
-        "possible_paths": [
-            [
-                {
-                    "trigger_point": (680, 600),
-                    "action": "turn_right",  # E->S
-                    "new_direction": "S"
-                }
-            ],
-            [
-                {
-                    "trigger_point": (720, 600),
-                    "action": "move_west_to_east",  
-                    "new_direction": "E"
-                }
-            ]
-            # [
-            #     {
-            #         "trigger_point": (700, 600),
-            #         "action": "move_east", 
-            #         "new_direction": "E"
-            #     },
-            #     {
-            #         "trigger_point": (720, 530),
-            #         "action": "turn_left",  # E->N
-            #         "new_direction": "N"
-            #     }
-            # ],
-        
-        ]
-    }
-]
-
-##PER LANE TIMER AND data stracture
-lane_vehicles_map = {}
-
-def get_new_event_id():
-    get_new_event_id.counter += 1
-    return pygame.USEREVENT + get_new_event_id.counter
-
-get_new_event_id.counter = 0
-
-timers = []
-for lane_def in lanes_data:
-    lane_name = lane_def["name"]
-    lane_vehicles_map[lane_name] = []
-    for vtype in lane_def["vehicle_types"]:
-        event_id = get_new_event_id()
-        # Adjust spawn intervals if needed
-        spawn_interval = 2300 if vtype == "bike" else 2500
-        pygame.time.set_timer(event_id, spawn_interval)
-        timers.append((event_id, lane_name, vtype))
-
-#defining the directions/angles
-def angle_for_dir(direction):
-    """Return angle for direction: 0=S, 90=W, 180=N, 270=E."""
-    if direction == "N":
-        return 180
-    elif direction == "S":
-        return 0
-    elif direction == "E":
-        return 270
-    elif direction == "W":
-        return 90
-    return 0
-
-def move_coords(x, y, speed, direction):
-    if direction == "N":
-        return x, y - speed
-    elif direction == "S":
-        return x, y + speed
-    elif direction == "E":
-        return x + speed, y
-    elif direction == "W":
-        return x - speed, y
-    return x, y
-
-def distance_in_travel_dir(pos1, pos2, direction):
-    """
-    for distance calculation and collison avoidance
-    """
-    x1, y1 = pos1
-    x2, y2 = pos2
-    if direction == "S":
-        return y2 - y1
-    elif direction == "N":
-        return y1 - y2
-    elif direction == "E":
-        return x2 - x1
-    elif direction == "W":
-        return x1 - x2
-    return 999999
-
+start_time = pygame.time.get_ticks()
 
 class Vehicle:
-    def __init__(self, lane_def, vehicle_type, turn_instructions):
-        global screen_width, screen_height
-
-        self.lane_def = lane_def
+    def __init__(self, vehicle_type, lane_position):
         self.vehicle_type = vehicle_type
+        self.x = lane_position 
+        self.y = random.randint(-height, -50)  # Start vehicles off screen but not at the very edge
+        self.in_collision = False  # Track if vehicle is currently in collision
+        self.has_collided_with = set()  # Set of vehicles this one has already collided with
+        self.on_screen = False  # Track if vehicle is on screen
 
-        # Current direction (N,S,E,W)
-        self.direction = lane_def["travel_dir"]
-        self.stop_for_red = lane_def["stop_for_red"]
-        
-        # The instructions that define this vehicle’s route (picked randomly).
-        self.turn_instructions = turn_instructions
-
-        # Initial position
-        self.x, self.y = lane_def["spawn"]
-
-        
-        if vehicle_type == "bike":
-            self.width = 10
-            self.height = 25
-            self.max_speed = 2.5
+        if vehicle_type == "motorcycle":
+            self.max_speed = random.uniform(MOTORCYCLE_MIN_SPEED, MOTORCYCLE_MAX_SPEED)
+            self.speed = self.max_speed
         else:
-            self.width = 20
-            self.height = 40
-            self.max_speed = 2.0
-
-        self.speed = random.uniform(self.max_speed * 0.8, self.max_speed)
-        self.angle = angle_for_dir(self.direction)
-        self.turn_index = 0
-        self.has_been_counted = False
-
-    def yield_for_left_turn(self, all_vehicles):
-        """
-        If the next action is a left turn, yield to the traffic on the right
-        if they have green/orange. This is an example logic.
-        """
-        if self.turn_index >= len(self.turn_instructions):
-            return  # no turns => do nothing
-        
-        instr = self.turn_instructions[self.turn_index]
-        if instr["action"] != "turn_left":
-            return  # only yield on left turns
-        
-        # Mapping to find which direction is on your right:
-        dir_to_right = {"N": "W", "E": "N", "S": "E", "W": "S"}
-        right_side_dir = dir_to_right[self.direction]
-        
-        # Check if we are close enough to the turn point to consider yielding
-        trigger_x, trigger_y = instr["trigger_point"]
-        dist_to_trigger = math.hypot(self.x - trigger_x, self.y - trigger_y)
-        
-        if dist_to_trigger < 30:
-            # If the road to your right has green/orange, yield if conflict
-            if is_direction_green(right_side_dir):
-                conflict_found = False
-                for other in all_vehicles:
-                    if other is self:
-                        continue
-                    d = math.hypot(self.x - other.x, self.y - other.y)
-                    if d < 60:
-                        self.speed = 0
-                        conflict_found = True
-                        break
-                if not conflict_found:
-                    self.speed = min(self.speed + 0.2, self.max_speed)
-            else:
-                # If the road to your right is red, just go/accelerate
-                self.speed = min(self.speed + 0.2, self.max_speed)
-
-    def move_and_collide(self, lane_vehicles, all_vehicles):
-        global total_vehicles_passed
-        global dedicated_passed_south, shared_passed_south
-
-        
-       
-        # logic for south directional lane (520, 790)
-        if self.lane_def["name"] == "South-Branching-Lane":
-           
-            west_light_color = get_light_color_for_direction("E")
+            self.max_speed = random.uniform(CAR_MIN_SPEED, CAR_MAX_SPEED)
+            self.speed = self.max_speed
             
-            # If west has green or orange (is_direction_green includes both states)
-            if get_light_color_for_direction("E") in [GREEN, ORANGE]:
+        self.original_speed = self.speed
+        self.prev_y = self.y
 
-                
-                dist_to_stop = math.hypot(self.x - 520, self.y - 690)
-                
-                # If we're approaching the stop point, gradually slow down
-                if dist_to_stop < 50 and self.y < 690:
-                    self.speed = max(self.speed - 0.4, 0)
-                    return False  # Don't remove the vehicle
-                  # If we're exactly at y=690, stop completely
-                elif abs(self.y - 690) < 1:  # Using small threshold for floating point comparison
-                    self.speed = 0
-                    self.y = 690  
-                    return False  
-                # If we're past y=690, continue moving normally
-                elif self.y > 690:
-                    self.speed = min(self.speed + 0.2, self.max_speed)
+        if vehicle_type == "motorcycle":
+            self.size = random.randint(8, 10)  
+            self.width = self.size
+            self.length = self.size * 2
+        elif vehicle_type == "car":
+            self.width = random.randint(13, 20)  
+            self.length = random.randint(23, 33) 
+
+    def fall(self, vehicles_in_lane, safe_threshold):
+        global total_vehicles_passed
+        self.prev_y = self.y
+
+        closest_vehicle = None
+        closest_distance = float('inf')
+
+        # Find the closest vehicle ahead in the same lane
+        for other_vehicle in vehicles_in_lane:
+            if other_vehicle != self and other_vehicle.y > self.y:
+                distance = other_vehicle.y - self.y
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_vehicle = other_vehicle
+
+        # Adjust speed based on proximity to the closest vehicle
+        if closest_vehicle:
+            if closest_distance < safe_threshold:
+                # Too close, adjust speed to avoid collision
+                self.speed = max(closest_vehicle.speed - 0.5, 0)
+            elif closest_distance > 70:
+                self.speed = min(self.max_speed, self.original_speed + 0.5)
             else:
-                # If west has green/orange, resume normal speed
-                self.speed = min(self.speed + 0.2, self.max_speed)
-
-
-        # 1) Handle red/stop line if needed
-        if self.stop_for_red:
-            # figure out the stop line
-            dir_config = directions_data.get(self.direction, {})
-            if self.direction in ("N", "S"):
-                stop_line = dir_config.get("stop_line_y", None)
-            else:
-                stop_line = dir_config.get("stop_line_x", None)
-
-            if stop_line is not None:
-                dist_to_stop = self.distance_to_stop_line(stop_line)
-                # If we haven't crossed the stop line and the light is not green/orange => slow/stop
-                if dist_to_stop > 0 and not is_direction_green(self.direction):
-                    if dist_to_stop < 50:
-                        self.speed = max(self.speed - 0.4, 0)
-                    else:
-                        self.speed = min(self.speed + 0.2, self.max_speed)
-                else:
-                    # either already past line or we have green/orange
-                    self.speed = min(self.speed + 0.2, self.max_speed)
-            else:
-                # no stop line => do normal
-                self.speed = min(self.speed + 0.2, self.max_speed)
+                # Moderate distance, maintain original speed
+                self.speed = self.original_speed
         else:
-            # This lane ignores red
-            self.speed = min(self.speed + 0.2, self.max_speed)
+            # No vehicle ahead, move at maximum speed
+            self.speed = self.max_speed
 
-        # 2) Keep safe distance from vehicle ahead in the same lane
-        safe_threshold = motorcycle_safe_threshold if self.vehicle_type == "bike" else car_safe_threshold
-        closest_dist = float('inf')
-        closest_speed = None
-
-        for other in lane_vehicles:
-            if other is self:
-                continue
-            d = distance_in_travel_dir((self.x, self.y), (other.x, other.y), self.direction)
-            if 0 < d < closest_dist:
-                closest_dist = d
-                closest_speed = other.speed
-
-        if closest_dist < safe_threshold:
-            if closest_speed is not None:
-                self.speed = min(self.speed, closest_speed - 0.5)
-            if self.speed < 0:
-                self.speed = 0
-
-        # 3) Check for left-turn yield
-        self.yield_for_left_turn(all_vehicles)
-
-        # 4) Check turn instructions
-        self.check_turn_instructions()
-
-        # 5) Move
-        self.x, self.y = move_coords(self.x, self.y, self.speed, self.direction)
-
-        # 6) If off-screen, remove & increment counters
-        if (self.x < -50 or self.x > screen_width + 50 or
-            self.y < -50 or self.y > screen_height + 50):
-
-            if not self.has_been_counted:
-                total_vehicles_passed += 1
-                self.has_been_counted = True
-
-                if self.lane_def["travel_dir"] == "S":
-                    if self.lane_def["name"] in dedicated_lanes:
-                        dedicated_passed_south += 1
-                    else:
-                        shared_passed_south += 1
-
-            return True  
-        return False
-
-    def distance_to_stop_line(self, stop_line):
+        # Scale the movement speed while keeping the display speed in range
+        movement_scale = 1 
+        self.y += self.speed * movement_scale
         
-        half_len = (self.height / 2) if self.direction in ("N","S") else (self.width / 2)
+        # Check if vehicle entered screen
+        if not self.on_screen and self.y > 0:
+            self.on_screen = True
+            
+        # Check if vehicle exited screen
+        if self.y > height:
+            self.y = random.randint(-height, -50)  # Start further off screen
+            self.prev_y = self.y
+            self.on_screen = False
+            self.has_collided_with.clear()  # Reset collision history
+            self.in_collision = False
+            total_vehicles_passed += 1
 
-        if self.direction == "S":
-            return stop_line - (self.y + half_len)
-        elif self.direction == "N":
-            return self.y - half_len - stop_line
-        elif self.direction == "E":
-            return stop_line - (self.x + half_len)
-        elif self.direction == "W":
-            return self.x - half_len - stop_line
-        return 9999
-
-    def check_turn_instructions(self):
-        if self.turn_index >= len(self.turn_instructions):
-            return
-
-        instr = self.turn_instructions[self.turn_index]
-        tx, ty = instr["trigger_point"]
-        dist = math.hypot(self.x - tx, self.y - ty)
-        if dist < 15:
-            action = instr["action"]
-            if action == "turn_left":
-                self.turn_left(instr["new_direction"])
-            elif action == "turn_right":
-                self.turn_right(instr["new_direction"])
-            elif action == "move_up":
-                self.move_up(instr["new_direction"])
-            elif action == "branch":
-                self.branch(instr["new_direction"])
-            elif action == "branch_east":
-                self.branch_east(instr["new_direction"])
-            elif action == "move_west_to_east":
-                self.move_west_to_east(instr["new_direction"])
-            elif action == "move_east":
-                self.move_east(instr["new_direction"])
-            elif action == "turn_straight_east":
-                self.turn_straight_east(instr["new_direction"])
-           
-            self.turn_index += 1
-    def move_east(self, new_dir):
-        """
-        Move the vehicle east to (700, 600).
-        """
-        if self.x < 700:
-            self.x += self.speed  # Move east
-        else:
-           
-            pass
-
-    def turn_straight_east(self, new_dir):
-        """
-        Move the vehicle straight east to (720, 530).
-        """
-        if self.y > 530:
-            self.y -= self.speed  
-        else:
-           
-            self.direction = new_dir
-            self.angle = angle_for_dir(new_dir)
-
-
-    def move_up(self, new_dir):
-        """
-        Move the vehicle up to (680, 550) before turning left.
-        """
-        if self.y > 550:
-            self.y -= self.speed  
-        else:
-            # Once the vehicle reaches (680, 550), turn left
-            self.turn_left(new_dir)
-
-    def branch(self, new_dir):
-        instr = self.turn_instructions[self.turn_index]
-        tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty
-        if self.vehicle_type == "bike":
-            self.x, self.y = 510, 480
-        elif self.vehicle_type == "car":
-            self.x, self.y = 575, 480
-        self.direction = new_dir
-        self.angle = angle_for_dir(new_dir)
-    
-    def move_west_to_east(self, new_dir):
-       
-        instr = self.turn_instructions[self.turn_index]  
-        self.x, self.y = instr["trigger_point"]  
-        self.x, self.y = 680, 540  
-        self.direction = new_dir
-        self.angle = angle_for_dir(new_dir)
-
-
-    def branch_east(self, new_dir):
-        instr = self.turn_instructions[self.turn_index]
-        tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty  
-        
-        
-        if self.vehicle_type == "bike":
-            self.x, self.y = 538, 590  
-        elif self.vehicle_type == "car":
-            self.x, self.y = 600, 590  
-        
-        # Rotate to goo north
-        self.direction = new_dir
-        self.angle = angle_for_dir(new_dir)
-
-    def turn_left(self, new_dir):
-        instr = self.turn_instructions[self.turn_index]
-        tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty
-        if self.vehicle_type == "bike" and self.x == 440 and self.y == 520:
-            self.x, self.y = 480, 520
-        self.direction = new_dir
-        self.angle = angle_for_dir(new_dir)
-
-    def turn_right(self, new_dir):
-        instr = self.turn_instructions[self.turn_index]
-        tx, ty = instr["trigger_point"]
-        self.x, self.y = tx, ty
-        self.direction = new_dir
-        self.angle = angle_for_dir(new_dir)
+    def get_current_speed(self):
+        """Get the normalized speed for the vehicle type"""
+        return normalize_speed(self.speed, self.vehicle_type)
 
     def draw(self, surface):
-        vehicle_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        if self.vehicle_type == "bike":
-            pygame.draw.ellipse(vehicle_surf, YELLOW, (0, 0, self.width, self.height))
-        else:
-            pygame.draw.rect(vehicle_surf, WHITE, (0, 0, self.width, self.height))
-        rotated_surf = pygame.transform.rotate(vehicle_surf, -self.angle)
-        rect = rotated_surf.get_rect(center=(self.x, self.y))
-        surface.blit(rotated_surf, rect)
+        if self.vehicle_type == "motorcycle":
+            # Use red color for collisions, yellow for normal
+            color = RED if self.in_collision else YELLOW
+            oval_width = self.size * 2  
+            oval_height = self.size     
+            pygame.draw.ellipse(surface, color, (self.x - oval_height // 2, int(self.y) - oval_width // 2, oval_height, oval_width))
+        elif self.vehicle_type == "car":
+            # Use red color for collisions, white for normal
+            color = RED if self.in_collision else WHITE
+            pygame.draw.rect(surface, color, (self.x, int(self.y), self.width, self.length))
 
+    def get_rect(self):
+        # Return a pygame Rect for collision detection
+        if self.vehicle_type == "motorcycle":
+            oval_width = self.size * 2
+            oval_height = self.size
+            return pygame.Rect(self.x - oval_height // 2, int(self.y) - oval_width // 2, oval_height, oval_width)
+        else:  # car
+            return pygame.Rect(self.x, int(self.y), self.width, self.length)
 
-clock = pygame.time.Clock()
+def check_collisions():
+    # For dedicated lanes, we should check collisions only within the same lane
+    # Since vehicles stay in their own lanes, we should only detect rear-end collisions
+    global collision_count
+    
+    # Reset collision flags for all vehicles
+    for lane, lane_vehicles in vehicles.items():
+        for vehicle in lane_vehicles:
+            vehicle.in_collision = False
+    
+    for lane, lane_vehicles in vehicles.items():
+        # Sort vehicles in lane by y-position (front to back)
+        sorted_vehicles = sorted(lane_vehicles, key=lambda v: v.y)
+        
+        # Check for collisions between consecutive vehicles
+        for i in range(len(sorted_vehicles) - 1):
+            front_vehicle = sorted_vehicles[i]
+            back_vehicle = sorted_vehicles[i + 1]
+            
+            # Skip if either vehicle is not on screen
+            if not front_vehicle.on_screen or not back_vehicle.on_screen:
+                continue
+                
+            # Skip if vehicles are far apart
+            if back_vehicle.y + back_vehicle.length < front_vehicle.y:
+                continue
+                
+            # Create Rect objects for collision detection
+            rect1 = front_vehicle.get_rect()
+            rect2 = back_vehicle.get_rect()
+            
+            # Check for collision
+            if rect1.colliderect(rect2):
+                # Mark both vehicles as in collision for visual effect
+                front_vehicle.in_collision = True
+                back_vehicle.in_collision = True
+                
+                # Only count collision if these two vehicles haven't collided before
+                if back_vehicle not in front_vehicle.has_collided_with:
+                    front_vehicle.has_collided_with.add(back_vehicle)
+                    back_vehicle.has_collided_with.add(front_vehicle)
+                    collision_count += 1
+                    print(f"Collision detected: {front_vehicle.vehicle_type}-{back_vehicle.vehicle_type} in lane {lane}")
+
+motorcycle_positions = [120, 180]
+car_positions = [45, 240]
+vehicle_types = ["motorcycle", "car"]
+probabilities = [0.7, 0.3]  
+
+vehicles = {pos: [] for pos in motorcycle_positions + car_positions}
+safe_threshold = 50
+
+# Timers for each lane position
+timers = {pos: pygame.USEREVENT + i + 1 for i, pos in enumerate(motorcycle_positions + car_positions)}
+
+# Reduce vehicle generation frequency to avoid overcrowding
+for pos in motorcycle_positions:
+    pygame.time.set_timer(timers[pos], 2000)  # Every 2 seconds for motorcycles
+    
+for pos in car_positions:
+    pygame.time.set_timer(timers[pos], 3000)  # Every 3 seconds for cars
+
+# Spawn initial vehicles immediately
+for pos in motorcycle_positions:
+    new_vehicle = Vehicle("motorcycle", pos)
+    vehicles[pos].append(new_vehicle)
+
+for pos in car_positions:
+    new_vehicle = Vehicle("car", pos)
+    vehicles[pos].append(new_vehicle)
+
+last_print_time = time.time()
+def calculate_average_speeds():
+    car_speeds = []
+    for lane in car_positions:
+        if car_velocity_data[lane]['display_speed'] > 0:
+            car_speeds.append(car_velocity_data[lane]['display_speed'] * scaling_factor)
+    car_avg = sum(car_speeds) / len(car_speeds) if car_speeds else 0
+
+    bike_speeds = []
+    for lane in motorcycle_positions:
+        if motorcycle_velocity_data[lane]['display_speed'] > 0:
+            bike_speeds.append(motorcycle_velocity_data[lane]['display_speed'] * scaling_factor)
+    bike_avg = sum(bike_speeds) / len(bike_speeds) if bike_speeds else 0
+
+    return car_avg, bike_avg
+
+# Main loop
 running = True
-all_vehicles = []
-
+clock = pygame.time.Clock()
 while running:
-    dt = clock.tick(60)
+    clock.tick(FPS)
     current_time = pygame.time.get_ticks()
-
-   
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+    
+        for pos, timer in timers.items():
+            if event.type == timer:
+                if pos in motorcycle_positions:
+                    # Ensure sufficient spacing between motorcycles
+                    if not vehicles[pos] or vehicles[pos][-1].y > 100:  # Increased gap for motorcycles
+                        if random.random() < 0.6:  # Reduced probability
+                            new_vehicle = Vehicle("motorcycle", pos)
+                            vehicles[pos].append(new_vehicle)
+                else:  
+                    if random.random() < 0.2:  # Reduced probability
+                        if not vehicles[pos] or vehicles[pos][-1].y > 50:
+                            new_vehicle = Vehicle("car", pos)
+                            vehicles[pos].append(new_vehicle)
 
+    screen.fill(BLUE)
+
+    for y in range(0, height, 20):  
+        pygame.draw.line(screen, WHITE, (90, y), (90, y + 10), 2)  
+        pygame.draw.line(screen, WHITE, (205, y), (205, y + 10), 2)  
+    
+    pygame.draw.line(screen, WHITE, (300, 0), (300, height), 5)
+    pygame.draw.line(screen, WHITE, (310, 0), (310, height), 5)
+
+    # Update and draw vehicles, calculate speeds
+    for lane, lane_vehicles in vehicles.items():
+        active_vehicles = []
+        speeds_sum = 0
+        vehicle_count = 0
         
-        for (ev_id, lane_name, vtype) in timers:
-            if event.type == ev_id:
-                
-                lane_def = None
-                for ld in lanes_data:
-                    if ld["name"] == lane_name:
-                        lane_def = ld
-                        break
-                if not lane_def:
-                    continue
-
-                lane_list = lane_vehicles_map[lane_name]
-                if len(lane_list) < max_vehicles_per_lane:
-                 
-                    chosen_path = random.choice(lane_def["possible_paths"])
-                    # Create a new vehicle with that path
-                    newv = Vehicle(lane_def, vtype, chosen_path)
-                    lane_list.append(newv)
-                    all_vehicles.append(newv)
-
-   # 2) Update traffic-light cycle
-    elapsed_light = current_time - light_state_start
-    if elapsed_light > light_durations[light_state]:
-        # Move to the next state
-        if light_state == "green":
-            light_state = "orange"
-        elif light_state == "orange":
-            light_state = "allred"
-        elif light_state == "allred":
-            # Was allred => move to next direction's green
-            direction_index = (direction_index + 1) % len(direction_order)
-            if direction_order[direction_index] == "W":
-                light_state = "green_west"
-            else:
-                light_state = "green"
-        elif light_state == "green_west":
-            light_state = "orange_west"
-        elif light_state == "orange_west":
-            light_state = "allred"
-        light_state_start = current_time
-
-    # 3) Update traffic lights
-    for direction, ddata in directions_data.items():
-        color = get_light_color_for_direction(direction)
-        for coord in ddata["traffic_lights"]:
-            dash_colors[coord] = color
-
+        for vehicle in lane_vehicles:
+            if vehicle.y <= height:
+                vehicle.fall(lane_vehicles, safe_threshold)
+                speeds_sum += vehicle.get_current_speed()
+                vehicle_count += 1
+                active_vehicles.append(vehicle)
+        
+        vehicles[lane] = active_vehicles
+        
+        # to update speed display every SPEED_UPDATE_INTERVAL milliseconds
+        if vehicle_count > 0:
+            if lane in car_positions:
+                if current_time - car_velocity_data[lane]["update_time"] >= SPEED_UPDATE_INTERVAL:
+                    car_velocity_data[lane]["display_speed"] = speeds_sum / vehicle_count
+                    car_velocity_data[lane]["update_time"] = current_time
+            elif lane in motorcycle_positions:
+                if current_time - motorcycle_velocity_data[lane]["update_time"] >= SPEED_UPDATE_INTERVAL:
+                    motorcycle_velocity_data[lane]["display_speed"] = speeds_sum / vehicle_count
+                    motorcycle_velocity_data[lane]["update_time"] = current_time
     
-    screen.blit(background_image, (0, 0))
-
+    # Check for collisions after all vehicles have moved
+    check_collisions()
     
-    dash_length = 20
-    dash_thickness = 5
-    for direction, ddata in directions_data.items():
-        for (lx, ly) in ddata["traffic_lights"]:
-            color = dash_colors.get((lx, ly), RED)
-            if direction in ("N", "S"): #horizontal dash draw 
-                pygame.draw.line(screen, color,
-                                 (lx - dash_length//2, ly),
-                                 (lx + dash_length//2, ly),
-                                 dash_thickness)
-            else:  # E, W => draw a vertical dash
-                pygame.draw.line(screen, color,
-                                 (lx, ly - dash_length//2),
-                                 (lx, ly + dash_length//2),
-                                 dash_thickness)
+    # Draw all vehicles after collision checks
+    for lane, lane_vehicles in vehicles.items():
+        for vehicle in lane_vehicles:
+            vehicle.draw(screen)
 
-    # Show which direction is active
-    font = pygame.font.SysFont(None, 24)
-    # active_dir = direction_order[direction_index]
-    # info_txt = f"Active: {active_dir} [{light_state.upper()}]"
-    # info_surf = font.render(info_txt, True, (255, 255, 255))
-    # screen.blit(info_surf, (20, 20))
+    # Calculate elapsed time
+    elapsed_time = pygame.time.get_ticks() - start_time  # in milliseconds
+    elapsed_seconds = elapsed_time // 1000  #  seconds
+    elapsed_minutes = elapsed_seconds // 60  #  minutes
+    elapsed_seconds %= 60  # Remaining seconds
 
-    # 6) Update & draw vehicles
-    to_remove = []
-    for v in all_vehicles:
-        lane_name = v.lane_def["name"]
-        lane_list = lane_vehicles_map[lane_name]
-        remove_it = v.move_and_collide(lane_list, all_vehicles)
-        v.draw(screen)
-        if remove_it:
-            to_remove.append(v)
+    font = pygame.font.Font(None, 24)
+    y_offset = 150
+    text = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, WHITE)
+    screen.blit(text, (450, y_offset))
+    timer_text = font.render(f"Time: {elapsed_minutes:02}:{elapsed_seconds:02}",True, WHITE)
+    screen.blit(timer_text, (400, y_offset+180))
 
-    # Remove off-screen vehicles
-    for remv in to_remove:
-        all_vehicles.remove(remv)
-        lane_vehicles_map[remv.lane_def["name"]].remove(remv)
+    scaling_factor = 6.9 
 
-    # 7) Show total passed
-    txt = font.render(f"Total Vehicles Passed: {total_vehicles_passed}", True, (255,255,255))
-    screen.blit(txt, (100, 100))
+    y_offset += 30
+    for lane in car_positions:
+        # scaling process
+        scaled_speed = car_velocity_data[lane]['display_speed'] * scaling_factor
+        text = font.render(f"Car Avg Speed (Lane {lane}): {scaled_speed:.2f} km/hr", True, WHITE)
+        screen.blit(text, (400, y_offset))
+        y_offset += 30
 
-    text_n = font.render( "N", True, (255,255,255))
-    screen.blit(text_n, (370,100))
-
-    text_n = font.render( "W", True, (255,255,255))
-    screen.blit(text_n, (100,700))
-
-    text_n = font.render( "S", True, (255,255,255))
-    screen.blit(text_n, (820,730))
-
-    text_n = font.render( "E", True, (255,255,255))
-    screen.blit(text_n, (1110,390))
-
-    # # Show dedicated vs shared lanes rate (for vehicles that came from North -> South)
-    # dedicated_txt = font.render(f"DEDICATED LANES RATE: {dedicated_passed_south}", True, (255,255,255))
-    # screen.blit(dedicated_txt, (20, 80))
-
-    # shared_txt = font.render(f"SHARED LANES RATE: {shared_passed_south}", True, (255,255,255))
-    # screen.blit(shared_txt, (20, 110))
+    for lane in motorcycle_positions:
+        scaled_speed = motorcycle_velocity_data[lane]['display_speed'] * scaling_factor
+        text = font.render(f"Motorcycle Avg Speed (Lane {lane}): {scaled_speed:.2f} km/hr", True, WHITE)
+        screen.blit(text, (400, y_offset))
+        y_offset += 30
+    
+    # Display collision count
+    text = font.render(f"Collision Count: {collision_count}", True, RED)
+    screen.blit(text, (400, y_offset))
+    
+    current_time = time.time()
+    if current_time - last_print_time >= 1.0:  #every second printing
+        car_avg, bike_avg = calculate_average_speeds()
+        minutes = elapsed_minutes
+        seconds = elapsed_seconds
+        print(f"Time {minutes:02d}:{seconds:02d} - Car Avg Speed: {car_avg:.2f} km/hr, Bike Avg Speed: {bike_avg:.2f} km/hr")
+        last_print_time = current_time
 
     pygame.display.flip()
 
 pygame.quit()
-sys.exit()
